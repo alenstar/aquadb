@@ -21,7 +21,8 @@ public:
     void append(const TlvValue &v);
     void append(const TlvObject &v);
 
-    int serialize(uint16_t tag, std::string &out) const;
+    int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
+    int deserialize(const std::vector<uint8_t> &in) const;
     int deserialize(const std::string &in) const;
     int deserialize(BytesBuffer *in, uint16_t &tag) const;
 
@@ -35,7 +36,8 @@ public:
     TlvObject();
     ~TlvObject();
 
-    int serialize(uint16_t tag, std::string &out) const;
+    int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
+    inline int serialize(std::vector<uint8_t> &out) const { return serialize(0, out);}
     /**
      * @brief
      *
@@ -44,23 +46,39 @@ public:
      * @return int != 0 fial； == 0  success
      */
     int deserialize(const std::string &in);
+    int deserialize(const std::vector<uint8_t> &in);
     int deserialize(BytesBuffer *in, uint16_t &tag);
 
+    int insert(int tag, const TlvValue& v)
+    {
+        _values[tag] = v;
+    }
+    int insert(int tag, TlvValue&& v)
+    {
+        _values[tag] = std::move(v);
+    }
+
+    int insert(int tag, const TlvObject& v);
+    int insert(int tag, const TlvArray& v);
+
+    TlvValue* get(int tag) 
+    {
+        auto it = _values.find(tag);
+        if(it == _values.cend())
+        {
+            return nullptr;
+        }
+        return &(it->second);
+    }
+    size_t size() const { return _values.size();}
 private:
     TlvObject(const TlvObject &c);
     TlvObject &operator=(const TlvObject &c);
 
 public:
-    // put one TLV object
-
-    // do encode
-    // returns number of TLVs in TlvObject, along with a vector of the tags
-    int GetTLVList(std::vector<int> &list) const;
 
 private:
-    // std::map<int,Tlv*> mTlvMap;
     std::map<int, TlvValue> _values;
-    // std::vector<TlvObject*> _boxs; // 记录box对象，用于回收资源
 };
 
 } // namespace tlv

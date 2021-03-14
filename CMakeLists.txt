@@ -25,8 +25,11 @@ endif()
 
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-  "Choose the type of build, options are: Debug Profile Release Asan Ubsan." FORCE)
+  #set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+  #"Choose the type of build, options are: Debug Profile Release Asan Ubsan." FORCE)
+  # default Debug 
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+    "Choose the type of build, options are: Debug Profile Release Asan Ubsan." FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 message("CMake build type ${CMAKE_BUILD_TYPE}")
 if( CMAKE_BUILD_TYPE STREQUAL "Release" )
@@ -83,6 +86,7 @@ endif()
 
 add_subdirectory(util)
 add_subdirectory(tlv)
+add_subdirectory(tests)
 
 
 # used by doc home and in packaging

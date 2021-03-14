@@ -136,7 +136,7 @@ public:
      * @return int64_t
      */
     int64_t to_long() const;
-    int64_t to_ulong() const;
+    //int64_t to_ulong() const;
 
     /**
      * @brief 获取浮点值, 自动类型转换
@@ -234,7 +234,7 @@ public:
 
     uint8_t wrie_type() const;
 
-    int serialize(uint16_t tag,std::string& out) const;
+    int serialize(uint16_t tag,std::vector<uint8_t>& out) const;
 
     /**
      * @brief 
@@ -268,7 +268,7 @@ private:
         char _buffer[sizeof(int64_t)];
         double _fval;
         int64_t _ival;
-        uint64_t _uval;
+        //uint64_t _uval;
         char *_sval;
     };
     char _padding[sizeof(int32_t)]; // padding
@@ -393,7 +393,8 @@ inline void TlvValue::set_value(uint64_t v)
 {
     clear();
     _dtype = 2;
-    _uval = v;
+    //_uval = v;
+    _ival = static_cast<int64_t>(v);
 }
 
 inline void TlvValue::set_value(uint32_t v)
