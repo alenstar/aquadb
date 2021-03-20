@@ -27,7 +27,7 @@ TEST_CASE("testing the tlv_object") {
     CHECK(obj.get(6)->to_string() == std::string("hello world!"));
     std::vector<uint8_t> out;
     obj.serialize(out);
-    LOGI("serialize size=%llu", out.size());
+    LOGI("serialize size=%lu", out.size());
 
     TlvObject obj2;
     obj2.deserialize(out);

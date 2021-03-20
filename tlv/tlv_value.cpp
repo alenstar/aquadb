@@ -1,6 +1,7 @@
 ﻿#define SPDLOG_TAG "TLV"
 #include "tlv_value.h"
 #include "encoder.h"
+#include "tlv_object.h"
 #include "util/common.h"
 #include "util/logdef.h"
 #include "varint.h"
@@ -24,14 +25,14 @@ template <class T> inline std::ostream &operator<<(std::ostream &oss, const std:
 
 /** Raw memory casts helper */
 union _tlv_float_helper {
-  float as_float;
-  uint32_t as_uint;
+    float as_float;
+    uint32_t as_uint;
 };
 
 /** Raw memory casts helper */
 union _tlv_double_helper {
-  double as_double;
-  uint64_t as_uint;
+    double as_double;
+    uint64_t as_uint;
 };
 
 /////////////////////////////////////////////////////////////////////
@@ -46,6 +47,7 @@ TlvValue::TlvValue(uint64_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0)
 TlvValue::TlvValue(uint32_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
 TlvValue::TlvValue(double v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
 TlvValue::TlvValue(const std::string &v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+TlvValue::TlvValue(const char* v, size_t size) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v,size); }
 
 TlvValue::TlvValue(const TlvValue &cv)
 {
@@ -285,14 +287,14 @@ std::string TlvValue::to_string() const
 
 int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 {
-   int  rc =0 ;
+    int rc = 0;
     uint8_t wtype = wrie_type();
     uint8_t taglen[2] = {0x00};
-    LOGD("tag=%d,wtype=%d, size=%llu,%llu", tag, wtype, out.size(), size());
+    LOGD("tag=%d,wtype=%d, size=%lu,%lu", tag, wtype, out.size(), size());
     if (tag < 0x08)
     {
         taglen[0] = (tag << 4) | wtype;
-//    LOGD("tag=%d,wtype=%d, size=%llu,%llu %u", tag, wtype, out.size(), size(), taglen[0]);
+        //    LOGD("tag=%d,wtype=%d, size=%lu,%lu %u", tag, wtype, out.size(), size(), taglen[0]);
         out.push_back(taglen[0]);
     }
     else if (tag < 0x800) // 2048
@@ -313,29 +315,26 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     {
     case TLV_LTYPE_NULL: // /* null */
         /* code */
-    LOGD("is null or none");
+        LOGD("is null or none");
         break;
     case TLV_LTYPE_TRUE: /* true, 1 */
-    LOGD("is true or 1");
+        LOGD("is true or 1");
         break;
     case TLV_LTYPE_FALSE: /* false, 0 */
-    LOGD("is false or 0");
+        LOGD("is false or 0");
         break;
     case TLV_LTYPE_NAN: /* NaN */
         break;
-    case TLV_LTYPE_INF_POS: /* +Inf */
-        break;
-    case TLV_LTYPE_INF_NEG: /* -Inf */
+    case TLV_LTYPE_ONE_NEG: /* -1 */
         break;
     case TLV_LTYPE_VARINT_POS: /* integer > 0 */
         // encode varint
         {
             size_t len = varint_len_i(to_long());
-            LOGD("varint %llu, size=%llu", to_long(), len);
-        out.resize(out.size() + len);
-            rc= varint_encode(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(out.data() - len)), 9, to_long());
-            LOGD("varint %llu, size=%llu, rc=%llu", to_long(), len,rc);
-
+            // LOGD("varint %l, size=%lu", to_long(), len);
+            out.resize(out.size() + len);
+            rc = varint_encode(const_cast<uint8_t *>(out.data() + out.size() - len), 9, to_long());
+            // LOGD("varint %l, size=%lu, rc=%lu", to_long(), len,rc);
         }
         break;
     case TLV_LTYPE_VARINT_NEG: /* integer < 0 */
@@ -343,10 +342,10 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         {
             int64_t v = std::abs(to_long());
             size_t len = varint_len_i(v);
-            LOGD("varint %llu, size=%llu", to_long(), len);
-        out.resize(out.size() + len);
-            rc=varint_encode(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(out.data() - len)), 9, v);
-            LOGD("varint %llu, size=%llu, rc=%llu", to_long(), len,rc);
+            // LOGD("varint %l, size=%lu", to_long(), len);
+            out.resize(out.size() + len);
+            rc = varint_encode(const_cast<uint8_t *>(out.data() + out.size() - len), 9, v);
+            // LOGD("varint %l, size=%lu, rc=%lu", to_long(), len,rc);
         }
         break;
     case TLV_LTYPE_FLOAT32: /* float */
@@ -354,41 +353,66 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         // TODO
         // encode for float
         out.resize(out.size() + sizeof(float));
-        uint32_t * p = reinterpret_cast<uint32_t*>(out.data() - sizeof(float));
-           *p = KeyEncoder::to_little_endian_u32(((union _tlv_float_helper){.as_float = static_cast<float>(to_double())}).as_uint);
-           // out.append(reinterpret_cast<const char*>(&v), sizeof(v));
+        uint32_t *p = reinterpret_cast<uint32_t *>(out.data() + out.size() - sizeof(float));
+        *p = KeyEncoder::to_little_endian_u32(
+            ((union _tlv_float_helper){.as_float = static_cast<float>(to_double())}).as_uint);
     }
-        break;
+    break;
     case TLV_LTYPE_FLOAT64: /* double */
     {
         // TODO
         // encode for double
         out.resize(out.size() + sizeof(double));
-        LOGD("tag=%d, len=%llu, size=%llu",tag, sizeof(double), size());
-        uint64_t * p = reinterpret_cast<uint64_t*>(out.data() - sizeof(double));
-           *p= KeyEncoder::to_little_endian_u64(((union _tlv_double_helper){.as_double = to_double()}).as_uint);
-           // out.append(reinterpret_cast<const char*>(&v), sizeof(v));
+        // LOGD("tag=%d, len=%lu, size=%lu",tag, sizeof(double), size());
+        uint64_t *p = reinterpret_cast<uint64_t *>(out.data() + out.size() - sizeof(double));
+        *p = KeyEncoder::to_little_endian_u64(((union _tlv_double_helper){.as_double = to_double()}).as_uint);
     }
-        break;
+    break;
     case TLV_LTYPE_BYTES: /* bytes or array<uint8>, array<int8> string (non-terminal '\0' ) */
     {
         // encode varint
         size_t len = varint_len_i(size());
         out.resize(out.size() + len + size());
-        LOGD("tag=%d, len=%llu, size=%llu",tag, len, size());
-        varint_encode(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(out.data()) - len - size()), 9, size());
-        ::memcpy(out.data() - len, data(), size());
+        // LOGD("tag=%d, len=%lu, size=%lu",tag, len, size());
+        varint_encode(const_cast<uint8_t *>(out.data() + out.size() - len - size()), 9, size());
+        ::memcpy(out.data() + out.size() - size(), data(), size());
     }
     break;
     case TLV_LTYPE_ARRAY0: /* any type array, array_size + elem_type + elem_data[n] */
-    // break;
+    {
+        if (dtype() != 101)
+        {
+            LOGE("bad dtype:%d for array", dtype());
+            return -1;
+        }
+        auto obj = as_object<TlvArray>();
+        rc = obj->serialize(static_cast<uint16_t>(0), out);
+        if (rc != 0)
+        {
+            return rc;
+        }
+    }
+    break;
+    case TLV_LTYPE_OBJECT: /* object object_size + object_data */
+    {
+        if (dtype() != 100)
+        {
+            LOGE("bad dtype:%d for array", dtype());
+            return -1;
+        }
+        auto obj = as_object<TlvObject>();
+        rc = obj->serialize(static_cast<uint16_t>(0), out);
+        if (rc != 0)
+        {
+            return rc;
+        }
+    }
+    break;
     case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size + elem_data[n] */
     // break;
     case TLV_LTYPE_ARRAY4: /* array<int32> or array<uint32> array_size + elem_data[n] */
     // break;
     case TLV_LTYPE_ARRAY8: /* array<int64> or array<double> array_size + elem_data[n] */
-    // break;
-    case TLV_LTYPE_OBJECT: /* object object_size + object_data */
     // break;
     case TLV_LTYPE_ERROR: /* error type */
         break;
@@ -402,7 +426,7 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     return 0;
 }
 
-//int TlvValue::deserialize(const std::string &in)
+// int TlvValue::deserialize(const std::string &in)
 //{
 //    uint16_t tag = 0;
 //    BytesBuffer buf(reinterpret_cast<uint8_t*>(const_cast<char*>(in.data())), in.size());
@@ -411,21 +435,21 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 
 int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
 {
-    uint8_t* data = reinterpret_cast<uint8_t*>(in->data());
+    uint8_t *data = reinterpret_cast<uint8_t *>(in->data());
     uint8_t wtype = TLV_LTYPE_ERROR;
     char taglen[2] = {0x00};
     size_t pos = 0;
-    if(data[0] & 0x80)
+    if (data[0] & 0x80)
     {
         tag = (data[0] & 0x7f) | ((data[1] >> 4) & 0x0f);
         wtype = data[1] & 0x000f;
         pos += 2;
     }
-    else 
+    else
     {
         tag = (data[0] & 0x70) >> 4;
         wtype = data[0] & 0x000f;
-        pos +=1;
+        pos += 1;
     }
     data = in->peek(pos);
     // TODO
@@ -435,20 +459,26 @@ int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
         /* code */
         break;
     case TLV_LTYPE_TRUE: /* true, 1 */
+        set_value(1);
         break;
     case TLV_LTYPE_FALSE: /* false, 0 */
+        set_value(0);
         break;
     case TLV_LTYPE_NAN: /* NaN */
+        set_value(std::numeric_limits<double>::quiet_NaN());
         break;
-    case TLV_LTYPE_INF_POS: /* +Inf */
+    case TLV_LTYPE_ONE_NEG:
+        set_value(-1);
         break;
-    case TLV_LTYPE_INF_NEG: /* -Inf */
-        break;
+    // case TLV_LTYPE_INF_POS: /* +Inf */
+    //    break;
+    // case TLV_LTYPE_INF_NEG: /* -Inf */
+    //    break;
     case TLV_LTYPE_VARINT_POS: /* integer > 0 */
         // encode varint
         {
             int64_t v = 0;
-            size_t len = varint_decode(&v, data, in->size() < 9 ?  in->size() : 9);
+            size_t len = varint_decode(&v, data, in->size() < 9 ? in->size() : 9);
             in->peek(len);
             pos += len;
             set_value(v);
@@ -458,7 +488,7 @@ int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
         // encode varint abs(neg_number)
         {
             int64_t v = 0;
-            size_t len = varint_decode(&v, data, in->size() < 9 ?  in->size() : 9);
+            size_t len = varint_decode(&v, data, in->size() < 9 ? in->size() : 9);
             in->peek(len);
             pos += len;
             set_value(v * (-1));
@@ -466,32 +496,36 @@ int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
         break;
     case TLV_LTYPE_FLOAT32: /* float */
     {
-           float v = ((union _tlv_float_helper){.as_uint = KeyEncoder::to_little_endian_u32(*reinterpret_cast<uint32_t*>(in->data()))}).as_float;
-            pos += sizeof(v);
-            in->peek(sizeof(v));
-            set_value(v);
+        float v = ((union _tlv_float_helper){
+                       .as_uint = KeyEncoder::to_little_endian_u32(*reinterpret_cast<uint32_t *>(in->data()))})
+                      .as_float;
+        pos += sizeof(v);
+        in->peek(sizeof(v));
+        set_value(v);
     }
-        break;
+    break;
     case TLV_LTYPE_FLOAT64: /* double */
     {
-           double v = ((union _tlv_double_helper){.as_uint = KeyEncoder::to_little_endian_u64(*reinterpret_cast<uint64_t*>(in->data()))}).as_double;
-            pos += sizeof(v);
-            in->peek(sizeof(v));
-            set_value(v);
+        double v = ((union _tlv_double_helper){
+                        .as_uint = KeyEncoder::to_little_endian_u64(*reinterpret_cast<uint64_t *>(in->data()))})
+                       .as_double;
+        pos += sizeof(v);
+        in->peek(sizeof(v));
+        set_value(v);
     }
-        break;
+    break;
     case TLV_LTYPE_BYTES: /* bytes or array<uint8>, array<int8> string (non-terminal '\0' ) */
     {
         // encode varint
         int64_t sz = 0;
-        size_t len = varint_decode(&sz, data, in->size() < 9 ?  in->size() : 9);
+        size_t len = varint_decode(&sz, data, in->size() < 9 ? in->size() : 9);
         in->peek(len);
         pos += len;
-        set_value(reinterpret_cast<char*>(in->data()), sz);
+        set_value(reinterpret_cast<char *>(in->data()), sz);
         pos += sz;
-        in->peek(sz); 
+        in->peek(sz);
     }
-       break;
+    break;
     case TLV_LTYPE_ARRAY0: /* any type array, array_size + elem_type + elem_data[n] */
     // break;
     case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size + elem_data[n] */
@@ -536,124 +570,5 @@ std::ostream &operator<<(std::ostream &oss, const TlvValue &o)
     }
     return oss;
 }
-
-int serialize_bytes(uint16_t tag, const char *values, size_t size, std::string &out)
-{
-    if (size == 0)
-    {
-        // 空对象不编码
-        return 0;
-    }
-    uint8_t wtype = TLV_LTYPE_BYTES;
-    char taglen[2] = {0x00};
-    size_t pos = 0;
-    if (tag < 0x08)
-    {
-        taglen[0] = (tag << 4) | wtype;
-        out.assign(taglen, 1);
-        pos += 1;
-    }
-    else if (tag < 0x800) // 2048
-    {
-        taglen[0] = (tag & 0x007f) | 0x80;
-        taglen[1] = ((tag >> 8) & 0x00ff) | wtype;
-        out.assign(taglen, 2);
-        pos += 2;
-    }
-    else
-    {
-        // tag number is too big [0~2047]
-        // error
-        // TODO
-        return -1;
-    }
-    // write vector size
-    {
-        size_t len = varint_len_i(static_cast<int64_t>(size));
-        out.append(len, '\0');
-        len = varint_encode(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(out.data()) + pos), 9,
-                                   static_cast<int64_t>(size));
-        pos += len;
-    }
-    // write vector item
-    out.append(sizeof(int8_t) * size, '\0');
-    out.assign(values, size);
-    pos += sizeof(int8_t) * size;
-
-    return 0;
-}
-
-int serialize_array2(uint16_t tag, const std::vector<int16_t> &values, std::string &out)
-{
-    if (values.empty())
-    {
-        // 空对象不编码
-        return 0;
-    }
-    uint8_t wtype = TLV_LTYPE_ARRAY2;
-    char taglen[2] = {0x00};
-    size_t pos = 0;
-    if (tag < 0x08)
-    {
-        taglen[0] = (tag << 4) | wtype;
-        out.assign(taglen, 1);
-        pos += 1;
-    }
-    else if (tag < 0x800) // 2048
-    {
-        taglen[0] = (tag & 0x007f) | 0x80;
-        taglen[1] = ((tag >> 8) & 0x00ff) | wtype;
-        out.assign(taglen, 2);
-        pos += 2;
-    }
-    else
-    {
-        // tag number is too big [0~2047]
-        // error
-        // TODO
-        return -1;
-    }
-    // write vector size
-    {
-        size_t len = varint_len_i(static_cast<int64_t>(values.size()));
-        out.append(len, '\0');
-        len = varint_encode(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(out.data()) + pos), 9,
-                                   static_cast<int64_t>(values.size()));
-        pos += len;
-    }
-    // write vector item
-    out.append(sizeof(int16_t) * values.size(), '\0');
-    if(KeyEncoder::is_big_endian())
-    {
-    for (auto v : values)
-    {
-        uint16_t nwvalue = KeyEncoder::to_little_endian_u16(KeyEncoder::encode_i16(v));
-        out.assign((const char *)&nwvalue, sizeof(v));
-        // pos += sizeof(int16_t);
-    }
-    }
-    else 
-    {
-        out.append(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(int64_t));
-    }
-
-    pos += sizeof(int16_t) * values.size();
-
-    return 0;
-}
-
-int serialize_array2(uint16_t tag, const std::vector<uint16_t> &values, std::string &out) { return -1; }
-
-int serialize_array4(uint16_t tag, const std::vector<int32_t> &values, std::string &out) { return -1; }
-
-int serialize_array4(uint16_t tag, const std::vector<uint32_t> &values, std::string &out) { return -1; }
-
-int serialize_array4(uint16_t tag, const std::vector<float> &values, std::string &out) { return -1; }
-
-int serialize_array8(uint16_t tag, const std::vector<int64_t> &values, std::string &out) { return -1; }
-
-int serialize_array8(uint16_t tag, const std::vector<double> &values, std::string &out) { return -1; }
-
-int serialize_object(uint16_t tag, const std::vector<double> &values, std::string &out) { return -1; }
 
 } // namespace tlv

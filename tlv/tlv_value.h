@@ -92,6 +92,8 @@ public:
      * @param v
      */
     TlvValue(const std::string &v);
+
+    TlvValue(const char* v, size_t size);
     
     TlvValue(const TlvValue &cv);
     
@@ -246,21 +248,6 @@ public:
     // int deserialize(const std::string& in);
     int deserialize(BytesBuffer* in, uint16_t &tag);
 
-    // array<object>
-    //static int serialize_array0(uint16_t tag, const std::vector<TlvObject>& values,std::string& out);
-
-    static int serialize_bytes(uint16_t tag, const char* values, size_t size,std::string& out);
-
-    static int serialize_array2(uint16_t tag, const std::vector<int16_t>& values,std::string& out);
-    static int serialize_array2(uint16_t tag, const std::vector<uint16_t>& values,std::string& out);
-    static int serialize_array4(uint16_t tag, const std::vector<int32_t>& values,std::string& out);
-    static int serialize_array4(uint16_t tag, const std::vector<uint32_t>& values,std::string& out);
-    static int serialize_array4(uint16_t tag, const std::vector<float>& values,std::string& out);
-    static int serialize_array8(uint16_t tag, const std::vector<int64_t>& values,std::string& out);
-    //static int serialize_array8(uint16_t tag, const std::vector<uint64_t>& values,std::string& out);
-    static int serialize_array8(uint16_t tag, const std::vector<double>& values,std::string& out);
-    static int serialize_object(uint16_t tag, const std::vector<double>& values,std::string& out);
-
 
 private:
     union
@@ -272,8 +259,8 @@ private:
         char *_sval;
     };
     char _padding[sizeof(int32_t)]; // padding
-    uint32_t _size: 24;            // string size
-    uint32_t _dtype: 7;            // 0 null, 1 double, 2 int64, 3 string, 100 tlv_object, 101 tlv_array
+    uint32_t _size: 24;            // string size range in [0, 2^24 - 1]
+    uint32_t _dtype: 7;            // 0 null, 1 double, 2 int64, 3 string, 100 tlv_object, 101 tlv_array; ragne in [0,127]
     uint32_t _iscopy: 1;           // the string is copy, need free
 };
 
@@ -312,9 +299,9 @@ inline uint8_t TlvValue::wrie_type() const
         {
             return TLV_LTYPE_NAN;
         }
-        else if(std::isinf(_fval))
+        else if(_fval == -1.0)
         {
-            return TLV_LTYPE_INF_POS;
+            return TLV_LTYPE_ONE_NEG; // -1
         }
         return TLV_LTYPE_FLOAT64;
     case 2:
@@ -326,6 +313,10 @@ inline uint8_t TlvValue::wrie_type() const
         {
             return TLV_LTYPE_TRUE;//
         }
+        else if(_ival == -1)
+        {
+            return TLV_LTYPE_ONE_NEG;//
+        }
         else if(_ival > 0)
         {
            return TLV_LTYPE_VARINT_POS;// +int
@@ -333,6 +324,10 @@ inline uint8_t TlvValue::wrie_type() const
         return TLV_LTYPE_VARINT_NEG; // -int
     case 3:
         return TLV_LTYPE_BYTES;
+    case 100:
+        return TLV_LTYPE_OBJECT; // object
+    case 101:
+        return TLV_LTYPE_ARRAY0; // array 
     default:
         return TLV_LTYPE_ERROR; // error , unsupported data type
     }
