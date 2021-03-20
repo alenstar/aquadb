@@ -30,16 +30,3 @@
 #define TLV_VTYPE_STRING 3
 #define TLV_VTYPE_OBJECT 100
 #define TLV_VTYPE_ARRAY 101
-
-namespace tlv {
-class Slice
-{
-    public:
-    Slice();
-    char* data() const { return size_;}
-    size_t size() const { return size_;}
-    char* data_{nullptr};
-    size_t size_{0};
-};
-
-}

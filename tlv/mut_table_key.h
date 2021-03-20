@@ -17,7 +17,7 @@
 #include "key_encoder.h"
 #include "str.h"
 
-namespace baikaldb {
+namespace tlv {
 
 class TableKey;
 class MutTableKey {
@@ -26,9 +26,9 @@ public:
     MutTableKey() : _full(false) {}
 
     // create TableKey from a slice, use for extract fields
-    MutTableKey(rocksdb::Slice key, bool full = true) : 
+    MutTableKey(const Str& key, bool full = true) : 
         _full(full), 
-        _data(key.data_, key.size_) {}
+        _data(key.data(), key.size()) {}
 
     MutTableKey(const TableKey& key);
 

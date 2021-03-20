@@ -15,7 +15,7 @@
 #include "mut_table_key.h"
 #include "table_key.h"
 
-namespace baikaldb {
+namespace tlv {
 
 MutTableKey::MutTableKey(const TableKey& key) : 
         _full(key.get_full()),
@@ -29,4 +29,4 @@ MutTableKey& MutTableKey::append_index(const TableKey& key) {
 int MutTableKey::append_index(IndexInfo& index, TableRecord* record, int field_cnt, bool clear) {
     return record->encode_key(index, *this, field_cnt, clear, false);
 }
-} // end of namespace baikaldb
+} // end of namespace tlv

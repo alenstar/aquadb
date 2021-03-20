@@ -15,7 +15,7 @@
 #include "table_key.h"
 #include "mut_table_key.h"
 
-namespace baikaldb {
+namespace tlv{
 
 TableKey::TableKey(const MutTableKey& key) : 
         _full(key.get_full()),
@@ -24,4 +24,4 @@ TableKey::TableKey(const MutTableKey& key) :
 
 
 
-} // end of namespace baikaldb
+} // end of namespace tlv

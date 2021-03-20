@@ -61,8 +61,12 @@ class TlvObject
     void insert(int tag, const std::vector<uint8_t>& v);
     void insert(int tag, const std::vector<int8_t>& v);
 
-    TlvValue *get(int tag) const;
-    TlvValue& at(int tag) const;
+    const TlvValue *get(int tag) const;
+    TlvValue *get(int tag);
+
+    const TlvValue& at(int tag) const;
+    TlvValue& at(int tag) ;
+
     bool has(int tag) const;
     size_t size() const;
 
@@ -103,7 +107,7 @@ inline void TlvObject::insert(int tag, const std::vector<int8_t>& v)
     _values[tag] = std::move(val);
 }
 
-inline TlvValue *TlvObject::get(int tag) const
+inline const TlvValue *TlvObject::get(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -113,7 +117,23 @@ inline TlvValue *TlvObject::get(int tag) const
     return &(it->second);
 }
 
-inline TlvValue& TlvObject::at(int tag) const
+inline const TlvValue& TlvObject::at(int tag) const
+{
+    return _values.at(tag);
+}
+
+
+inline TlvValue *TlvObject::get(int tag) 
+{
+    auto it = _values.find(tag);
+    if (it == _values.cend())
+    {
+        return nullptr;
+    }
+    return &(it->second);
+}
+
+inline TlvValue& TlvObject::at(int tag) 
 {
     return _values.at(tag);
 }
