@@ -5,6 +5,8 @@ BasedOnStyle: LLVM
 # Allow double brackets such as std::vector<std::vector<int>>.
 Standard: Cpp11
 
+SortIncludes: false
+
 #缩进宽度
 IndentWidth: 4
 # 连续的空行保留几行
