@@ -9,7 +9,7 @@
 #    add_subdirectory(${subdir})
 #ENDFOREACH()
 
-set(LIB_TLV tlv)
+set(LIB_TLV tdb)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -20,7 +20,7 @@ file(GLOB_RECURSE LIB_TLV_INC  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h)
 
 #add_subdirectory(src)
 
-set(LIB_TLV_SRC tlv_object.cpp tlv_value.cpp varint.c mut_table_key.cpp table_key.cpp str.cpp)
+set(LIB_TLV_SRC db.cpp table.cpp)
 
 add_library(${LIB_TLV} ${LIB_TLV_SRC} ${LIB_TLV_INC})
 add_dependencies(${LIB_TLV} util)
