@@ -26,7 +26,4 @@ MutTableKey& MutTableKey::append_index(const TableKey& key) {
     return *this;
 }
 
-int MutTableKey::append_index(IndexInfo& index, TableRecord* record, int field_cnt, bool clear) {
-    return record->encode_key(index, *this, field_cnt, clear, false);
-}
 } // end of namespace tlv

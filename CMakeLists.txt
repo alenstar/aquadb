@@ -27,7 +27,7 @@ endif()
 if(NOT CMAKE_BUILD_TYPE)
   #set(CMAKE_BUILD_TYPE "Release" CACHE STRING
   #"Choose the type of build, options are: Debug Profile Release Asan Ubsan." FORCE)
-  # default Debug 
+  # default Debug
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
     "Choose the type of build, options are: Debug Profile Release Asan Ubsan." FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
@@ -41,13 +41,16 @@ if( CMAKE_BUILD_TYPE STREQUAL "Release" )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -O2 -Wall")
 else()
     # add_definitions(-DDEBUG)
-    add_definitions(-Wint-in-bool-context)
+    #add_definitions(-Wint-in-bool-context)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O0 -ggdb")
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -O0 -ggdb -Wall")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb -Wall")
 endif()
 
+# 重定义__FILE__ 去掉文件路径
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -Wno-builtin-macro-redefined -D__FILE__='\"$(notdir $(abspath $<))\"'")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wno-builtin-macro-redefined -D__FILE__='\"$(notdir $(abspath $<))\"'")
 
 execute_process(
     COMMAND bash -c "git --git-dir=${PROJECT_SOURCE_DIR}/.git rev-parse --short HEAD | tr -d '\n'"
@@ -70,6 +73,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}
 ${PROJECT_BINARY_DIR}
 ${PROJECT_SOURCE_DIR}/thirdparty
 ${PROJECT_SOURCE_DIR}/thirdparty/doctest
+${PROJECT_SOURCE_DIR}/thirdparty/lmdb
 ${PROJECT_SOURCE_DIR}/tlv)
 
 
@@ -84,6 +88,8 @@ else()
 set(SYS_LIBS z rt dl pthread)
 endif()
 
+add_subdirectory(thirdparty/lmdb)
+add_subdirectory(tdb)
 add_subdirectory(util)
 add_subdirectory(tlv)
 add_subdirectory(tests)

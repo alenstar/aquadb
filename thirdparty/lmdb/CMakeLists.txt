@@ -1,15 +1,15 @@
-cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
-project(lmdb)
+#cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
+#project(lmdb)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if($ENV{BUILD_NUMBER})
-  set(BUILD_NUMBER $ENV{BUILD_NUMBER})
-else()
-  set(BUILD_NUMBER 0)
-endif()
+#set(CMAKE_CXX_STANDARD 11)
+#set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#if($ENV{BUILD_NUMBER})
+#  set(BUILD_NUMBER $ENV{BUILD_NUMBER})
+#else()
+#  set(BUILD_NUMBER 0)
+#endif()
 
-set(LIB_NAME ${PROJECT_NAME})
+set(LIB_NAME lmdb)
 
 # TODO OP check how this works on multiple configurations generators
 # available configurations in multiple configurations enabled generators

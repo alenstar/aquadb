@@ -141,12 +141,20 @@ class STR_API Str
     //int                 Capacity : 21;          // Max 2 MB
     //int                 LocalBufSize : 10;      // Max 1023 bytes
     //unsigned int        Owned : 1;              // Set when we have ownership of the pointed data (most common, unless using set_ref() method or StrRef constructor)
-    // for x64
-    int64_t Capacity:26;
-    int64_t Length:26;
-    int64_t LocalBufSize:10;
+    // for x64 做如下调整
+    int64_t Capacity:26; // Max 64MB
+    int64_t Length:26; // Max 64MB
+    int64_t LocalBufSize:10; // drop, 固定栈上数据大小,使用Capacity来存储容量
     uint64_t Owned:1; // 
-    uint64_t Padding:1; // 
+    uint64_t Padding:1; // or onstack 在栈上分配
+
+    // 可做如下调整，调整后Str16栈上16+8个字节， (char*)this + sizeof(Str) - 8
+    // uint32_t cap:24 ; Max 16MB
+    // //int32_t len:23 ; Max 8MB; onstack=1 时通过strlen(buffer)计算; onstack=0时data前四个字节就是长度; 当前对象栈上最大 8 个字节， 通过继承可扩展到 N + 8
+    // uint32_t owened:1; // 所有权
+    // uint32_t onstack:1; // 栈上数据
+    // uint32_t padding:8; 1bytes
+    // char* data or buffer[sizeof(char*)];
 
 public:
     inline char*        c_str()                                 { return Data; }
@@ -161,18 +169,21 @@ public:
     inline int          capacity() const                        { return Capacity; }
 
     inline void         set_ref(const char* src);
+    inline void         set_ref(const char* src, int size);
     int                 setf(const char* fmt, ...);
     int                 setfv(const char* fmt, va_list args);
     int                 setf_nogrow(const char* fmt, ...);
     int                 setfv_nogrow(const char* fmt, va_list args);
     int                 append(char c);
     int                 append(const char* s, const char* s_end = NULL);
+    int                 append(const char* s, int size);
     int                 appendf(const char* fmt, ...);
     int                 appendfv(const char* fmt, va_list args);
     int                 append_from(int idx, char c);
     int                 append_from(int idx, const char* s, const char* s_end = NULL);		// If you know the string length or want to append from a certain point
     int                 appendf_from(int idx, const char* fmt, ...);
     int                 appendfv_from(int idx, const char* fmt, va_list args);
+    int                 replace(int idx, int src_size, const char* dest, int dest_size);
 
     void                clear();
     void                reserve(int cap);
@@ -185,8 +196,10 @@ public:
 
     inline Str();
     inline Str(const char* rhs);
+    inline Str(const char* rhs, int size);
     inline void         set(const char* src);
     inline void         set(const char* src, const char* src_end);
+    inline void         set(const char* src, int size);
     inline Str&         operator=(const char* rhs)              { set(rhs); return *this; }
     inline bool         operator==(const char* rhs) const       { return strcmp(c_str(), rhs) == 0; }
 
@@ -197,14 +210,14 @@ public:
     inline Str&         operator=(const Str& rhs)               { set(rhs); return *this; }
     inline Str&         operator=(Str&& rhs)                    { set(std::move(rhs)); return *this; }
     inline bool         operator==(const Str& rhs) const        { return strcmp(c_str(), rhs.c_str()) == 0; }
-    inline int          compare(const Str& rhs) const           { return strncmp(c_str(), rhs.c_str()); }
+    inline int          compare(const Str& rhs) const           { return strncmp(c_str(), rhs.c_str(), length() > rhs.length() ? length() : rhs.length()); }
 
 #if STR_SUPPORT_STD_STRING
     inline Str(const std::string& rhs);
     inline void         set(const std::string& src);
     inline Str&         operator=(const std::string& rhs)       { set(rhs); return *this; }
     inline bool         operator==(const std::string& rhs)const { return strcmp(c_str(), rhs.c_str()) == 0; }
-    inline int          compare(const std::string& rhs) const   { return strncmp(c_str(), rhs.c_str()); }
+    inline int          compare(const std::string& rhs) const   { return strncmp(c_str(), rhs.c_str(), length() > rhs.length() ? length() : rhs.length()); }
 #endif
 
     // Destructor for all variants
@@ -254,6 +267,18 @@ void    Str::set(const char* src, const char* src_end)
 {
     STR_ASSERT(src != NULL && src_end >= src);
     int buf_len = (int)(src_end-src)+1;
+    if ((int)Capacity < buf_len)
+        reserve_discard(buf_len);
+    memcpy(Data, src, (size_t)(buf_len - 1));
+    Data[buf_len-1] = 0;
+    Owned = 1;
+    Length = buf_len - 1;
+}
+
+void    Str::set(const char* src, int size)
+{
+    STR_ASSERT(src != NULL && size>= 0);
+    int buf_len = (int)(size) + 1;
     if ((int)Capacity < buf_len)
         reserve_discard(buf_len);
     memcpy(Data, src, (size_t)(buf_len - 1));
@@ -314,6 +339,16 @@ inline void Str::set_ref(const char* src)
     Length = strlen(src);
 }
 
+inline void Str::set_ref(const char* src, int size)
+{
+    if (Owned && !is_using_local_buf())
+        STR_MEMFREE(Data);
+    Data = src ? (char*)src : EmptyBuffer;
+    Capacity = 0;
+    Owned = 0;
+    Length = size;
+}
+
 Str::Str()
 {
     Data = EmptyBuffer;      // Shared READ-ONLY initial buffer for 0 capacity
@@ -338,6 +373,11 @@ Str::Str(const char* rhs) : Str()
     set(rhs);
 }
 
+Str::Str(const char* rhs, int size) : Str()
+{
+    set(rhs, size);
+}
+
 #if STR_SUPPORT_STD_STRING
 Str::Str(const std::string& rhs) : Str()
 {
@@ -350,6 +390,7 @@ class StrRef : public Str
 {
 public:
     StrRef(const char* s) : Str() { set_ref(s); }
+    StrRef(const char* s, int size) : Str() { set_ref(s, size); }
 };
 
 // Types embedding a local buffer
@@ -703,6 +744,12 @@ int     Str::append(const char* s, const char* s_end)
     return append_from(cur_len, s, s_end);
 }
 
+int     Str::append(const char* s, int size)
+{
+    int cur_len = length();
+    return append_from(cur_len, s, s + size);
+}
+
 int     Str::appendfv(const char* fmt, va_list args)
 {
     int cur_len = length();
@@ -717,6 +764,29 @@ int     Str::appendf(const char* fmt, ...)
     va_end(args);
     return len;
 }
+
+int     Str::replace(int idx, int src_size, const char* dest, int dest_size)
+{
+    int add_len = (int)(dest_size - src_size);
+    if (Capacity < idx + add_len + 1)
+        reserve(idx + add_len + 1);
+    if(add_len == 0) { // inplace
+        memcpy(Data + idx, (const void*)dest, (size_t)dest_size);
+    }
+    else if(add_len > 0) { // dest_size greet than src_size
+        memmove(Data + idx + dest_size, Data + idx + src_size, Length - idx - src_size);
+        memcpy(Data + idx, (const void*)dest, (size_t)dest_size);
+    }
+    else if(add_len < 0) { // 
+        memmove(Data + idx + dest_size, Data + idx + src_size, Length - idx - src_size);
+        memcpy(Data + idx, (const void*)dest, (size_t)dest_size);
+    }
+    Data[idx + add_len] = 0; // Our source data isn't necessarily zero-terminated
+    STR_ASSERT(Owned);
+    Length += add_len;
+    return add_len;
+}
+
 
 #endif // #define STR_IMPLEMENTATION
 

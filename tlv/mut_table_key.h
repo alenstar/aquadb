@@ -111,13 +111,14 @@ public:
     }
 
     MutTableKey& append_string(const std::string& val) {
-        _data.append(val);
-        _data.append(1, '\0');
+        _data.append(val.data(), val.size());
+        _data.append('\0');
+        //_data.append(1, '\0');
         return *this;
     }
 
     MutTableKey& append_string_prefix(const std::string& val) {
-        _data.append(val);
+        _data.append(val.data(), val.size());
         return *this;
     }
 
@@ -135,12 +136,12 @@ public:
     MutTableKey& append_index(const TableKey& key);
 
     MutTableKey& append_index(const MutTableKey& key) {
-        _data.append(key._data);
+        _data.append(key.data().data(), key.size());
         return *this;
     }
     
     MutTableKey& append_index(const std::string& key) {
-        _data.append(key);
+        _data.append(key.data(), key.size());
         return *this;
     }
 

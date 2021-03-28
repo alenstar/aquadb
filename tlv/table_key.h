@@ -34,7 +34,7 @@ class MutTableKey;
 class TableKey {
 public:
     virtual ~TableKey() {}
-    TableKey() : _full(false) {}
+    TableKey() : _full(false), _data(nullptr,0) {}
 
     // create TableKey from a slice, use for extract fields
     TableKey(const Str& key, bool full = true) : 
@@ -124,8 +124,6 @@ public:
     void extract_char(int pos, size_t len, std::string& out) {
         out.assign(_data.data() + pos, len);
     }
-
-    int extract_index(IndexInfo& index, TableRecord* record, int& pos);
 
     void set_full(bool full) {
         _full = full;

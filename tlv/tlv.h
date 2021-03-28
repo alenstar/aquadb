@@ -36,6 +36,7 @@ class TlvFieldInfo
         out.insert(5, TlvValue(len));
         out.insert(6, TlvValue(comment));
         out.insert(7, TlvValue(extra));
+        return 0;
     }
     int deserialize(const TlvObject &in)
     {
@@ -52,6 +53,7 @@ class TlvFieldInfo
         if (in.has(6)) comment = in.get(6)->to_string();
 
         if (in.has(7)) extra = in.get(7)->to_string();
+        return 0;
     }
 };
 
