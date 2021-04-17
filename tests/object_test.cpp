@@ -9,7 +9,7 @@
 using namespace tlv;
 
 TEST_CASE("testing the tlv_object") {
-    TlvObject obj;
+    TupleRecord obj;
     TlvValue a(1);
     TlvValue b(9889878);
     TlvValue c(0);
@@ -29,7 +29,7 @@ TEST_CASE("testing the tlv_object") {
     obj.serialize(out);
     LOGI("serialize size=%lu", out.size());
 
-    TlvObject obj2;
+    TupleRecord obj2;
     obj2.deserialize(out);
     CHECK(obj.size() == obj2.size());
     CHECK(obj2.get(0) == nullptr);

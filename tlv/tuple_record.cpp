@@ -19,7 +19,7 @@ TlvArray::~TlvArray()
     {
         if (v.dtype() == 100)
         {
-            auto p = v.as_object<TlvObject>();
+            auto p = v.as_object<TupleRecord>();
             delete p;
             v.clear();
         }
@@ -87,7 +87,7 @@ int TlvArray::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         break;
         case 100: // object
         {
-            auto obj = v.as_object<TlvObject>();
+            auto obj = v.as_object<TupleRecord>();
             obj->serialize(static_cast<uint16_t>(0), out);
         }
         break;
@@ -138,16 +138,16 @@ int TlvArray::deserialize(BytesBuffer *in, uint16_t &tag) const
     return -1;
 }
 
-TlvObject::TlvObject() {}
-TlvObject::TlvObject(TlvObject &&o) { _values = std::move(o._values); }
+TupleRecord::TupleRecord() {}
+TupleRecord::TupleRecord(TupleRecord &&o) { _values = std::move(o._values); }
 
-TlvObject::~TlvObject()
+TupleRecord::~TupleRecord()
 {
     for (auto v : _values)
     {
         if (v.second.dtype() == 100)
         {
-            auto p = v.second.as_object<TlvObject>();
+            auto p = v.second.as_object<TupleRecord>();
             delete p;
             v.second.clear();
         }
@@ -161,7 +161,7 @@ TlvObject::~TlvObject()
     _values.clear();
 }
 
-int TlvObject::serialize(uint16_t tag, std::vector<uint8_t> &out) const
+int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 {
     if (_values.empty())
     {
@@ -213,7 +213,7 @@ int TlvObject::serialize(uint16_t tag, std::vector<uint8_t> &out) const
             break;
         case 100: // object
         {
-            auto obj = v.second.as_object<TlvObject>();
+            auto obj = v.second.as_object<TupleRecord>();
             rc = obj->serialize(static_cast<uint16_t>(v.first), out);
             if (rc != 0)
             {
@@ -245,7 +245,7 @@ int TlvObject::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     return 0;
 }
 
-int TlvObject::deserialize(const std::string &in)
+int TupleRecord::deserialize(const std::string &in)
 {
     if (in.empty())
     {
@@ -258,7 +258,7 @@ int TlvObject::deserialize(const std::string &in)
     return deserialize(&buf, tag);
 }
 
-int TlvObject::deserialize(const std::vector<uint8_t> &in)
+int TupleRecord::deserialize(const std::vector<uint8_t> &in)
 {
     if (in.empty())
     {
@@ -271,7 +271,7 @@ int TlvObject::deserialize(const std::vector<uint8_t> &in)
     return deserialize(&buf, tag);
 }
 
-int TlvObject::deserialize(BytesBuffer *in, uint16_t &tag)
+int TupleRecord::deserialize(BytesBuffer *in, uint16_t &tag)
 {
     if (in->size() == 0)
     {

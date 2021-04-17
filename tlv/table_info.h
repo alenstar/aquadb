@@ -33,7 +33,7 @@ class TlvFieldInfo
 
     void set_type(uint16_t dtp, uint16_t ptp) { type = dtp | (ptp << 8); }
     bool is_unsigned() const { return flags & 0x04; }
-    int serialize(TlvObject &out) const
+    int serialize(TupleRecord &out) const
     {
         out.insert(1, TlvValue(name));
         out.insert(2, TlvValue(id));
@@ -44,7 +44,7 @@ class TlvFieldInfo
         out.insert(7, TlvValue(extra));
         return 0;
     }
-    int deserialize(const TlvObject &in)
+    int deserialize(const TupleRecord &in)
     {
         if (in.has(1)) name = in.get(1)->to_string();
 
@@ -101,22 +101,22 @@ class TlvTableInfo
     }
 
     // 获取索引key
-    int get_index_key(const std::vector<int> &fields,TlvObject &obj, MutTableKey &key);
+    int get_index_key(const std::vector<int> &fields,TupleRecord &obj, MutTableKey &key);
     // 获取主键key
-    int get_primary_key(TlvObject &obj, MutTableKey &key);
+    int get_primary_key(TupleRecord &obj, MutTableKey &key);
 
     int serialize(std::vector<uint8_t> &out)
     {
-        TlvObject obj;
+        TupleRecord obj;
         obj.insert(1, TlvValue(id));
         obj.insert(2, TlvValue(version));
         obj.insert(3, TlvValue(name));
         obj.insert(4, TlvValue(comment));
         obj.insert(5, TlvValue(reinterpret_cast<const char *>(primarykey.data()), primarykey.size()));
-        TlvObject subobj;
+        TupleRecord subobj;
         obj.insert(6, std::move(subobj));
         for (auto const &field : fields) {
-            TlvObject item;
+            TupleRecord item;
             field.second.serialize(item);
             subobj.insert(field.first, std::move(item));
         }
@@ -124,7 +124,7 @@ class TlvTableInfo
     }
     int deserialize(const std::vector<uint8_t> &in)
     {
-        TlvObject obj;
+        TupleRecord obj;
         int rc = obj.deserialize(in);
         if (rc != 0) {
             return rc;
@@ -146,7 +146,7 @@ class TlvTableInfo
         }
 
         if (obj.has(6)) {
-            auto subobj = obj.get(6)->as_object<TlvObject>();
+            auto subobj = obj.get(6)->as_object<TupleRecord>();
             // TODO
             TlvFieldInfo field;
             if (field.deserialize(*subobj) != 0) {

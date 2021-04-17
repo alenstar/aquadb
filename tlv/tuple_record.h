@@ -10,7 +10,7 @@ namespace tlv
 {
 
 // class TlvValue;
-class TlvObject;
+class TupleRecord;
 // class BytesBuffer;
 
 class TlvArray
@@ -21,7 +21,7 @@ class TlvArray
     ~TlvArray();
 
     void append(const TlvValue &v);
-    void append(const TlvObject &v);
+    void append(const TupleRecord &v);
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
     int deserialize(const std::vector<uint8_t> &in) const;
@@ -32,13 +32,13 @@ class TlvArray
     std::vector<TlvValue> _values;
 };
 
-// TlvObject or TlvObj
-class TlvObject
+// TupleRecord or TlvObj
+class TupleRecord
 {
   public:
-    TlvObject();
-    TlvObject(TlvObject &&o);
-    ~TlvObject();
+    TupleRecord();
+    TupleRecord(TupleRecord &&o);
+    ~TupleRecord();
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
     inline int serialize(std::vector<uint8_t> &out) const { return serialize(0, out); }
@@ -56,7 +56,7 @@ class TlvObject
     // tag range in [0,2047]
     void insert(int tag, const TlvValue &v);
     void insert(int tag, TlvValue &&v);
-    void insert(int tag, TlvObject &&v);
+    void insert(int tag, TupleRecord &&v);
     void insert(int tag, TlvArray &&v);
     void insert(int tag, const std::vector<uint8_t>& v);
     void insert(int tag, const std::vector<int8_t>& v);
@@ -71,43 +71,43 @@ class TlvObject
     size_t size() const;
 
   private:
-    TlvObject &operator=(const TlvObject &c);
+    TupleRecord &operator=(const TupleRecord &c);
 
   public:
   private:
     std::map<int, TlvValue> _values;
 };
-inline void TlvObject::insert(int tag, const TlvValue &v) { _values[tag] = v; }
-inline void TlvObject::insert(int tag, TlvValue &&v) { _values[tag] = std::move(v); }
+inline void TupleRecord::insert(int tag, const TlvValue &v) { _values[tag] = v; }
+inline void TupleRecord::insert(int tag, TlvValue &&v) { _values[tag] = std::move(v); }
 
-inline void TlvObject::insert(int tag, TlvObject &&v)
+inline void TupleRecord::insert(int tag, TupleRecord &&v)
 {
     TlvValue val;
-    val.set_ptr(new TlvObject(std::move(v)), 100);
+    val.set_ptr(new TupleRecord(std::move(v)), 100);
     _values[tag] = std::move(val);
 }
-inline void TlvObject::insert(int tag, TlvArray &&v)
+inline void TupleRecord::insert(int tag, TlvArray &&v)
 {
     TlvValue val;
     val.set_ptr(new TlvArray(std::move(v)), 101);
     _values[tag] = std::move(val);
 }
 
-inline void TlvObject::insert(int tag,const std::vector<uint8_t>& v)
+inline void TupleRecord::insert(int tag,const std::vector<uint8_t>& v)
 {
     TlvValue val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
-inline void TlvObject::insert(int tag, const std::vector<int8_t>& v)
+inline void TupleRecord::insert(int tag, const std::vector<int8_t>& v)
 {
     TlvValue val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
-inline const TlvValue *TlvObject::get(int tag) const
+inline const TlvValue *TupleRecord::get(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -117,13 +117,13 @@ inline const TlvValue *TlvObject::get(int tag) const
     return &(it->second);
 }
 
-inline const TlvValue& TlvObject::at(int tag) const
+inline const TlvValue& TupleRecord::at(int tag) const
 {
     return _values.at(tag);
 }
 
 
-inline TlvValue *TlvObject::get(int tag) 
+inline TlvValue *TupleRecord::get(int tag) 
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -133,12 +133,12 @@ inline TlvValue *TlvObject::get(int tag)
     return &(it->second);
 }
 
-inline TlvValue& TlvObject::at(int tag) 
+inline TlvValue& TupleRecord::at(int tag) 
 {
     return _values.at(tag);
 }
 
-inline bool TlvObject::has(int tag) const
+inline bool TupleRecord::has(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -148,11 +148,11 @@ inline bool TlvObject::has(int tag) const
     return true;
 }
 
-inline size_t TlvObject::size() const { return _values.size(); }
+inline size_t TupleRecord::size() const { return _values.size(); }
 
 ///////////////////////////////////////
 // array<object>
-// int serialize_array0(uint16_t tag, const std::vector<TlvObject>& values, std::vector<uint8_t>& out);
+// int serialize_array0(uint16_t tag, const std::vector<TupleRecord>& values, std::vector<uint8_t>& out);
 
 int serialize_bytes(uint16_t tag, const char *values, size_t size, std::vector<uint8_t> &out);
 

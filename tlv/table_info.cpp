@@ -46,7 +46,7 @@ inline int append_value(const TlvFieldInfo *field, const TlvValue *v, MutTableKe
     return 0;
 }
 // 获取索引key
-int TlvTableInfo::get_index_key(const std::vector<int> &fields, TlvObject &obj, MutTableKey &key)
+int TlvTableInfo::get_index_key(const std::vector<int> &fields, TupleRecord &obj, MutTableKey &key)
 {
     std::vector<const TlvFieldInfo *> infos;
     int rc = get_index_key_info(fields, infos);
@@ -61,7 +61,7 @@ int TlvTableInfo::get_index_key(const std::vector<int> &fields, TlvObject &obj, 
     return 0;
 }
 // 获取主键key
-int TlvTableInfo::get_primary_key(TlvObject &obj,MutTableKey &key)
+int TlvTableInfo::get_primary_key(TupleRecord &obj,MutTableKey &key)
 {
 
     std::vector<const TlvFieldInfo *> infos;

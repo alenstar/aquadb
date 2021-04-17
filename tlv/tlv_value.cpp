@@ -371,7 +371,7 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
                 LOGE("bad dtype:%d for array", dtype());
                 return -1;
             }
-            auto obj = as_object<TlvObject>();
+            auto obj = as_object<TupleRecord>();
             rc       = obj->serialize(static_cast<uint16_t>(0), out);
             if (rc != 0) {
                 return rc;
