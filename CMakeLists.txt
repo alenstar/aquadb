@@ -92,6 +92,7 @@ add_subdirectory(thirdparty/lmdb)
 add_subdirectory(tdb)
 add_subdirectory(util)
 add_subdirectory(tlv)
+add_subdirectory(cerebro)
 add_subdirectory(tests)
 
 

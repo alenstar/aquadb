@@ -4,6 +4,8 @@
 
 typedef std::string Symbol;
 
+class CerebroBroker;
+class CerebroDataFeed;
 // 投资组合-策略所有账户的集合
 class CerebroPortfolio
 {
@@ -392,7 +394,7 @@ struct CerebroComponent
 {
     std::vector<std::pair<int,int>> component; // [start_date, end_date] 闭区间组合
     const std::pair<int,int>* contain(int date) const; // 日期在组合内
-}
+};
 
 class CerebroEvent
 {

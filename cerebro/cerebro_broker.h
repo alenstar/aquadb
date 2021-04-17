@@ -4,7 +4,6 @@
 #include "cerebro_struct.h"
 
 
-class CerebroBroker;
 // 撮合器， 一个交易所一个撮合器， 内部再按品种分不同处理模块
 class CerebroMatcher
 {
@@ -101,7 +100,7 @@ class CerebroBroker
     double calc_frozen_cash(const CerebroOrder& order, double last_price = 0.0)
     {
         // 计算需冻结的资金
-        return (order.price + _slippage) * order.quantity
+        return (order.price + _slippage) * order.quantity;
     }
 
     // 解除冻结, 成交后解除冻结（冻结资金-成交金额）
@@ -157,12 +156,7 @@ class CerebroBroker
 
     void on_tick(const CerebroTickRecord &record); // 接收tick时间，触发订单撮合
 
-    void on_order_update(const CerebroOrder &order)
-    {
-        // TODO
-        // 订单更新时Matcher回调此接口
-        // 此接口要实现数据持久化，并将订单更新事件发给策略或其它订阅者
-    }
+    void on_order_update(const CerebroOrder &order);
 
     // 交易接口，必须返回订单号
     int64_t buy(const Symbol &symbol, double quantity, double price = 0.0);
@@ -234,7 +228,7 @@ class CerebroDataFeed
     // 获取数据表
     int get_data_table(const Symbol& symbols, int date, int num, const std::string& tblname);
     // 获取成份数据
-    int get_component(const Symbol &index, std::map<Symbol, CerebroComonent>& component);
+    int get_component(const Symbol &index, std::map<Symbol, CerebroComponent>& component);
 
     // 判断ST
     bool is_st(const Symbol &symbol, int date) const;
