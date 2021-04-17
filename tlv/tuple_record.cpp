@@ -1,6 +1,5 @@
 #define SPDLOG_TAG "TLV"
-#include "tlv_object.h"
-#include "tlv.h"
+#include "tuple_record.h"
 #include "tlv_value.h"
 #include "util/common.h"
 #include "util/logdef.h"

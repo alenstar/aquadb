@@ -51,10 +51,10 @@ int DBManager::open(const DBOption &opt)
 
     DB_ENV *dbenv;
     if ((ret = db_env_create(&dbenv, 0)) != 0) {
-                fprintf(errfp, "%s: %s\n", progname, db_strerror(ret));
+                fprintf(stderr, "%s: %s\n", progname, db_strerror(ret));
                 return (1);
         }
-        dbenv->set_errfile(dbenv, errfp);
+        dbenv->set_errfile(dbenv, stderr);
         dbenv->set_errpfx(dbenv, progname);
         if ((ret = dbenv->set_cachesize(dbenv, 0, 64 * 1024, 0)) != 0) {
                 dbenv->err(dbenv, ret, "set_cachesize");
@@ -62,10 +62,10 @@ int DBManager::open(const DBOption &opt)
                 return (1);
         }
 
-        (void)dbenv->set_data_dir(dbenv, data_dir);
+        (void)dbenv->set_data_dir(dbenv, _basepath.c_str());
 
-        if ((ret = dbenv->open(dbenv, home, DB_CREATE | DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN, 0644)) != 0) {
-                dbenv->err(dbenv, ret, "environment open: %s", home);
+        if ((ret = dbenv->open(dbenv, _basepath.c_str(), DB_CREATE | DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN, 0644)) != 0) {
+                dbenv->err(dbenv, ret, "environment open: %s", _basepath.c_str());
                 dbenv->close(dbenv, 0);
                 return (1);
         }

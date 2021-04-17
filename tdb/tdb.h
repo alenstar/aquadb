@@ -4,7 +4,7 @@
 #include "lmdb/lmdb.h"
 #include <db.h>
 #include "tbl.h"
-#include "tlv/tlv.h"
+#include "tlv/table_info.h"
 
 struct DBOption
 {

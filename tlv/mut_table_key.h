@@ -127,6 +127,16 @@ public:
         return *this;
     }
 
+    MutTableKey& append_fixed_char(const char* data, size_t size, size_t fixed_size) {
+        size_t sz = std::min(size, fixed_size);
+        _data.append(data, sz);
+        if(sz < fixed_size)
+        {
+            _data.append(fixed_size - sz, '\0');
+        }
+        return *this;
+    }
+
     MutTableKey& append_boolean(bool val) {
         uint8_t encode = val? uint8_t(1) : uint8_t(0);
         _data.append((char*)&encode, sizeof(uint8_t));

@@ -1,7 +1,8 @@
 #pragma once
-#include <tlv_object.h>
+#include <tuple_record.h>
 #include <tlv_types.h>
 #include <tlv_value.h>
+#include "mut_table_key.h"
 
 namespace tlv
 {
@@ -16,17 +17,22 @@ class TlvFieldInfo
     std::string name;    // 1 字段名
     uint16_t id    = 0;  // 2 字段id
     uint16_t type  = 0;  // 3 数据类型
-    uint32_t flags = 0;  // 4 扩展标记，0x01 主键 primary key, 0x02 允许 none
+    uint32_t flags = 0;  // 4 扩展标记，0x01 主键 primary key, 0x02 允许 none, 0x04 unsigned
     uint32_t len   = 0;  // 5 数据长度
     std::string comment; // 6 注释
     std::string extra;   // 7 扩展字段, json or msgpack or cbor
 
+    uint32_t size() const { return len; }
     // 数据类型, long double string
     uint8_t dtype() const { return 0x0ff & type; }
+    void set_dtype(uint8_t t) { type = (type & 0xff00) | t; }
     // 展示类型 int8,int16,int32, int64,double,float,text, bytes, blob,
     // date,datetime, JSON, CBOR
     uint8_t ptype() const { return (0xff00 & type) >> 8; }
+    void set_ptype(uint8_t t) { type = (type & 0x00ff) | (t << 8); }
 
+    void set_type(uint16_t dtp, uint16_t ptp) { type = dtp | (ptp << 8); }
+    bool is_unsigned() const { return flags & 0x04; }
     int serialize(TlvObject &out) const
     {
         out.insert(1, TlvValue(name));
@@ -75,6 +81,29 @@ class TlvTableInfo
      * 2 {name: createtime, id: 0, dtype:int64}
      * 3 {name: modifytime, id: 0, dtype:int64}
      */
+
+    int get_primary_key_info(std::vector<const TlvFieldInfo *> infos)
+    {
+        for (auto i : primarykey) {
+            auto const it = fields.at(i);
+            infos.push_back(&it);
+        }
+        return 0;
+    }
+
+    int get_index_key_info(const std::vector<int> &ids, std::vector<const TlvFieldInfo *> infos)
+    {
+        for (auto i : ids) {
+            auto const it = fields.at(i);
+            infos.push_back(&it);
+        }
+        return 0;
+    }
+
+    // 获取索引key
+    int get_index_key(const std::vector<int> &fields,TlvObject &obj, MutTableKey &key);
+    // 获取主键key
+    int get_primary_key(TlvObject &obj, MutTableKey &key);
 
     int serialize(std::vector<uint8_t> &out)
     {
@@ -138,25 +167,6 @@ struct TlvIndexInfo
     std::string tblname;         // 表名
     std::vector<uint8_t> fields; // 索引字段
     uint8_t type;                // 索引类型
-};
-
-class TlvMessage
-{
-  public:
-    TlvMessage();
-    int parse(const std::string &in);
-    // 获取索引key
-    TlvValue get_index_key(const std::vector<uint8_t> &fields);
-    // 获取主键key
-    TlvValue get_primary_key(const std::vector<uint8_t> &fields);
-
-    int serialize(std::vector<uint8_t> &out) { return _obj.serialize(out); }
-    int deserialize(const std::vector<uint8_t> &in) { return _obj.deserialize(in); }
-
-  private:
-    TlvObject _obj;
-    std::string _raw_data; // 原始数据
-    std::string _pk_data;  // 主键数据
 };
 
 }; // namespace tlv

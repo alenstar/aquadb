@@ -3,7 +3,7 @@
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
-#include "tlv/tlv.h"
+#include "tlv/tuple_record.h"
 #include "util/logdef.h"
 
 using namespace tlv;
