@@ -39,6 +39,39 @@ private:
     int64_t _start;
 };
 
+struct RocksdbVars {
+    static RocksdbVars* get_instance() {
+        static RocksdbVars _instance;
+        return &_instance;
+    }
+
+    bvar::LatencyRecorder    rocksdb_put_time_cost;
+    bvar::LatencyRecorder    rocksdb_get_time_cost;
+    bvar::LatencyRecorder    rocksdb_scan_time_cost;
+    bvar::LatencyRecorder    rocksdb_seek_time_cost;
+    bvar::LatencyRecorder    qos_fetch_tokens_wait_time_cost;
+    bvar::Adder<int64_t>     qos_fetch_tokens_wait_count;
+    bvar::Adder<int64_t>     qos_fetch_tokens_count;
+    bvar::PerSecond<bvar::Adder<int64_t> > qos_fetch_tokens_qps;
+    bvar::Adder<int64_t>     qos_token_waste_count;
+    bvar::PerSecond<bvar::Adder<int64_t> > qos_token_waste_qps;
+    // 统计未提交的binlog最大时间
+    bvar::Maxer<int64_t>     binlog_not_commit_max_cost;
+    bvar::Window<bvar::Maxer<int64_t> > binlog_not_commit_max_cost_minute;
+
+private:
+    RocksdbVars(): rocksdb_put_time_cost("rocksdb_put_time_cost"),
+                   rocksdb_get_time_cost("rocksdb_get_time_cost"),
+                   rocksdb_scan_time_cost("rocksdb_scan_time_cost"),
+                   rocksdb_seek_time_cost("rocksdb_seek_time_cost"),
+                   qos_fetch_tokens_wait_time_cost("qos_fetch_tokens_wait_time_cost"),
+                   qos_fetch_tokens_wait_count("qos_fetch_tokens_wait_count"),
+                   qos_fetch_tokens_qps("qos_fetch_tokens_qps", &qos_fetch_tokens_count),
+                   qos_token_waste_qps("qos_token_waste_qps", &qos_token_waste_count),
+                   binlog_not_commit_max_cost_minute("binlog_not_commit_max_cost_minute", &binlog_not_commit_max_cost, 60) {
+                   }
+};
+
 namespace myrocksdb {
 
 class Iterator {
