@@ -19,6 +19,9 @@
 
 #include "data_types.h"
 
+#define VALUE_MAX_STRING_LENGTH (sizeof(int64_t) + sizeof(int32_t) - 1)
+#define VALUE_MAX_LOCAL_LENGTH (sizeof(int64_t) + sizeof(int32_t))
+
 namespace aquadb
 {
 //////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +54,17 @@ class BytesBuffer
 class Value
 {
 public:
+    enum DataType
+    {
+        NONE = 0, 
+        DOUBLE = 1, 
+        LONG = 2, 
+        STRING = 3, 
+        ULONG = 4, 
+        OBJECT = 5, 
+        ARRAY = 6, 
+    };
+
     /**
      * @brief 构造空对象
      *
@@ -261,18 +275,18 @@ private:
     char _padding[sizeof(int32_t)]; // padding
     uint32_t _size: 24;            // string size range in [0, 2^24 - 1]
     uint32_t _dtype: 7;            // 0 null, 1 double, 2 int64, 3 string, 100 tlv_object, 101 tlv_array; ragne in [0,127]
-    uint32_t _iscopy: 1;           // the string is copy, need free
+    uint32_t _isowner: 1;           // the string is copy, need free
 };
 
 inline void Value::clear()
 {
-    if (_iscopy)
+    if (_isowner)
     {
         free(_sval);
     }
     _size = 0;
     _dtype = 0;
-    _iscopy = 0;
+    _isowner = 0;
     _sval = nullptr;
 }
 
@@ -305,6 +319,7 @@ inline uint8_t Value::wrie_type() const
         }
         return TLV_LTYPE_FLOAT64;
     case 2:
+    //case 4:
         if(_ival == 0)
         {
             return TLV_LTYPE_FALSE;//
@@ -324,9 +339,9 @@ inline uint8_t Value::wrie_type() const
         return TLV_LTYPE_VARINT_NEG; // -int
     case 3:
         return TLV_LTYPE_BYTES;
-    case 100:
+    case DataType::OBJECT :
         return TLV_LTYPE_OBJECT; // object
-    case 101:
+    case DataType::ARRAY :
         return TLV_LTYPE_ARRAY0; // array 
     default:
         return TLV_LTYPE_ERROR; // error , unsupported data type
@@ -335,7 +350,7 @@ inline uint8_t Value::wrie_type() const
 
 inline const char *Value::c_str() const
 {
-    if (_iscopy)
+    if (_isowner)
     {
         return _sval;
     }
@@ -397,6 +412,13 @@ inline void Value::set_value(uint32_t v)
     clear();
     _dtype = 2;
     _ival = v;
+}
+
+inline void Value::set_ptr(void* ptr, uint8_t type)
+{
+    clear();
+    _dtype = type;
+    _sval = reinterpret_cast<char*>(ptr);
 }
 
 inline bool Value::is_none() const

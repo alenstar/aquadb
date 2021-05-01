@@ -124,7 +124,7 @@ int Array::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     }
     return 0;
 }
-int Array::deserialize(const std::string &in) const
+int Array::deserialize(const std::string &in) 
 {
     // TODO
     uint16_t tag = 0;
@@ -132,10 +132,55 @@ int Array::deserialize(const std::string &in) const
     return deserialize(&buf, tag);
 }
 
-int Array::deserialize(BytesBuffer *in, uint16_t &tag) const
+int Array::deserialize(BytesBuffer *in, uint16_t &tag)
 {
     // TODO
-    return -1;
+    if (in->size() == 0)
+    {
+        // 空对象不解码
+        return 0;
+    }
+    uint8_t *data = in->data();
+    uint8_t wtype = TLV_LTYPE_ERROR;
+    char taglen[2] = {0x00};
+    size_t pos = 0;
+    if (data[0] & 0x80)
+    {
+        tag = (data[0] & 0x7f) | ((data[1] >> 4) & 0x0f);
+        wtype = data[1] & 0x000f;
+        pos += 2;
+    }
+    else
+    {
+        tag = (data[0] & 0x70) >> 4;
+        wtype = data[0] & 0x000f;
+        pos += 1;
+    }
+    LOGD("tag=%d, wtype=%d, pos=%lu", tag, wtype, pos);
+    in->peek(pos);
+    int64_t size = 0;
+    // read vector size
+    {
+        size_t len = varint_decode(&size, const_cast<uint8_t *>(in->data()), 9);
+        in->peek(len);
+    }
+    // TODO
+    // std::string buf = in.substr(pos);
+    int rc = 0;
+    for (int64_t i = 0; i < size; ++i)
+    {
+        Value value;
+        uint16_t subtag = 0;
+        rc = value.deserialize(in, subtag);
+        if (rc != 0)
+        {
+            LOGE("bad format: tag=%d, value=%s", subtag, value.to_string().c_str());
+            break;
+        }
+        LOGD("tag=%d, dtype=%d, value=%s", subtag, value.dtype(), value.to_string().c_str());
+        _values.emplace_back(std::move(value));
+    }
+    return 0;
 }
 
 TupleRecord::TupleRecord() {}
@@ -211,7 +256,7 @@ int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
                 return rc;
             }
             break;
-        case 100: // object
+        case Value::DataType::OBJECT: // object
         {
             auto obj = v.second.as_object<TupleRecord>();
             rc = obj->serialize(static_cast<uint16_t>(v.first), out);
@@ -223,7 +268,7 @@ int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
             }
         }
         break;
-        case 101: // array
+        case Value::DataType::ARRAY: // array
         {
             auto arr = v.second.as_object<Array>();
             rc = arr->serialize(static_cast<uint16_t>(v.first), out);

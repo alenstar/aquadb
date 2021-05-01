@@ -24,9 +24,9 @@ class Array
     void append(const TupleRecord &v);
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
-    int deserialize(const std::vector<uint8_t> &in) const;
-    int deserialize(const std::string &in) const;
-    int deserialize(BytesBuffer *in, uint16_t &tag) const;
+    int deserialize(const std::vector<uint8_t> &in) ;
+    int deserialize(const std::string &in) ;
+    int deserialize(BytesBuffer *in, uint16_t &tag) ;
 
   private:
     std::vector<Value> _values;

@@ -46,7 +46,7 @@ inline int append_value(const FieldDescriptor *field, const Value *v, MutTableKe
     return 0;
 }
 // 获取索引key
-int TableDescriptor::get_index_key(const std::vector<int> &fields, TupleRecord &obj, MutTableKey &key)
+int TableDescriptor::get_index_key(const std::vector<uint16_t> &fields, TupleRecord &obj, MutTableKey &key)
 {
     std::vector<const FieldDescriptor *> infos;
     int rc = get_index_key_info(fields, infos);

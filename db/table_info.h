@@ -58,9 +58,11 @@ class IndexDescriptor
 {
     public:
     uint16_t id    = 0;  // 1 索引id
-    uint16_t type = 0;   // 2 索引类型，0x01 唯一索引, 0x02 二级索引
-    std::vector<uint8_t> fields; // 3 索引字段, 索引字段ID必须在1-255
+    uint16_t type = 0;   // 2 索引类型: 0x01 主键索引，0x02 唯一索引, 0x04 二级索引
+    std::vector<uint16_t> fields; // 3 索引字段, 索引字段ID必须在1-255
     std::string name;    // 4 索引名
+
+    inline bool is_primary_key() const { return 0x01 == type;}
 
     int serialize(std::vector<uint8_t> &out)
     {
@@ -161,7 +163,8 @@ class TableDescriptor
     uint32_t version;                   // 2 版本
     std::string name;                   // 3 表名
     std::string comment;                // 4 注释
-    std::vector<uint8_t> primarykey;    // 5 主键, 字段ID必须在1-255
+    //std::vector<uint16_t> primarykey;  // 5 主键, 字段ID必须在1-255
+    //std::vector<IndexDescriptor*> indexs;  // 5 索引, 字段ID必须在1-255
     std::map<int, FieldDescriptor> fields; // 6 字段信息 <字段id，字段信息>,  字段0内部使用
     // field: 0 object
     /**
@@ -172,14 +175,14 @@ class TableDescriptor
 
     int get_primary_key_info(std::vector<const FieldDescriptor *> infos)
     {
-        for (auto i : primarykey) {
+        for (auto i : _primarykey->fields) {
             auto const it = fields.at(i);
             infos.push_back(&it);
         }
         return 0;
     }
 
-    int get_index_key_info(const std::vector<int> &ids, std::vector<const FieldDescriptor *> infos)
+    int get_index_key_info(const std::vector<uint16_t> &ids, std::vector<const FieldDescriptor *> infos)
     {
         for (auto i : ids) {
             auto const it = fields.at(i);
@@ -189,7 +192,8 @@ class TableDescriptor
     }
 
     // 获取索引key
-    int get_index_key(const std::vector<int> &fields,TupleRecord &obj, MutTableKey &key);
+    inline int get_index_key(const IndexDescriptor* index,TupleRecord &obj, MutTableKey &key) { return get_index_key(index->fields,obj, key);}
+    int get_index_key(const std::vector<uint16_t> &fields,TupleRecord &obj, MutTableKey &key);
     // 获取主键key
     int get_primary_key(TupleRecord &obj, MutTableKey &key);
 
@@ -200,7 +204,8 @@ class TableDescriptor
         obj.insert(2, Value(version));
         obj.insert(3, Value(name));
         obj.insert(4, Value(comment));
-        obj.insert(5, Value(reinterpret_cast<const char *>(primarykey.data()), primarykey.size()));
+        // 采用小端
+        obj.insert(5, Value(reinterpret_cast<const char *>(_primarykey->fields.data()), _primarykey->fields.size() * sizeof(uint16_t)));
         TupleRecord subobj;
         obj.insert(6, std::move(subobj));
         for (auto const &field : fields) {
@@ -228,10 +233,11 @@ class TableDescriptor
 
         if (obj.has(5)) {
             auto v = obj.get(5);
-            //const uint16_t* p = reinterpret_cast<const uint16_t*>(v->data());
-            //size_t sz = v->size() / sizeof(uint16_t);
-            for (size_t i = 0; i < v->size(); ++i) {
-                primarykey.push_back((uint8_t)(v->data()[i]));
+            // 采用小端
+            const uint16_t* p = reinterpret_cast<const uint16_t*>(v->data());
+            size_t sz = v->size() / sizeof(uint16_t);
+            for (size_t i = 0; i < sz; ++i) {
+                _primarykey->fields.push_back((uint16_t)(v->data()[i]));
             }
         }
 
@@ -290,6 +296,7 @@ class TableDescriptor
     std::string _dbname; // 库名
     int status = 0; // 表状态, 加锁时使用
     std::vector<IndexDescriptor*> _indexs; // 索引
+    IndexDescriptor* _primarykey {nullptr}; // 索引
 };
 
 }; // namespace aquadb
