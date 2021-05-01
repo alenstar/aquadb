@@ -23,7 +23,7 @@
 #include "raft_log_compaction_filter.h"
 #include "split_compaction_filter.h"
 #include "transaction_db_bthread_mutex.h"
-namespace tdb {
+namespace aquadb {
 
 DEFINE_int32(rocks_transaction_lock_timeout_ms, 20000, "rocksdb transaction_lock_timeout, real lock_time is 'time + rand_less(time)' (ms)");
 DEFINE_int32(rocks_default_lock_timeout_ms, 30000, "rocksdb default_lock_timeout(ms)");

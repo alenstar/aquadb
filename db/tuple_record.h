@@ -2,25 +2,25 @@
 
 #include <map>
 #include <string>
-#include <tlv_types.h>
-#include <tlv_value.h>
+#include "data_types.h"
+#include "tuple_value.h"
 #include <vector>
 
-namespace tlv
+namespace aquadb
 {
 
-// class TlvValue;
+// class Value;
 class TupleRecord;
 // class BytesBuffer;
 
-class TlvArray
+class Array
 {
   public:
-    TlvArray();
-    TlvArray(TlvArray &&a);
-    ~TlvArray();
+    Array();
+    Array(Array &&a);
+    ~Array();
 
-    void append(const TlvValue &v);
+    void append(const Value &v);
     void append(const TupleRecord &v);
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
@@ -29,7 +29,7 @@ class TlvArray
     int deserialize(BytesBuffer *in, uint16_t &tag) const;
 
   private:
-    std::vector<TlvValue> _values;
+    std::vector<Value> _values;
 };
 
 // TupleRecord or TlvObj
@@ -54,18 +54,18 @@ class TupleRecord
     int deserialize(BytesBuffer *in, uint16_t &tag);
 
     // tag range in [0,2047]
-    void insert(int tag, const TlvValue &v);
-    void insert(int tag, TlvValue &&v);
+    void insert(int tag, const Value &v);
+    void insert(int tag, Value &&v);
     void insert(int tag, TupleRecord &&v);
-    void insert(int tag, TlvArray &&v);
+    void insert(int tag, Array &&v);
     void insert(int tag, const std::vector<uint8_t>& v);
     void insert(int tag, const std::vector<int8_t>& v);
 
-    const TlvValue *get(int tag) const;
-    TlvValue *get(int tag);
+    const Value *get(int tag) const;
+    Value *get(int tag);
 
-    const TlvValue& at(int tag) const;
-    TlvValue& at(int tag) ;
+    const Value& at(int tag) const;
+    Value& at(int tag) ;
 
     bool has(int tag) const;
     size_t size() const;
@@ -75,39 +75,39 @@ class TupleRecord
 
   public:
   private:
-    std::map<int, TlvValue> _values;
+    std::map<int, Value> _values;
 };
-inline void TupleRecord::insert(int tag, const TlvValue &v) { _values[tag] = v; }
-inline void TupleRecord::insert(int tag, TlvValue &&v) { _values[tag] = std::move(v); }
+inline void TupleRecord::insert(int tag, const Value &v) { _values[tag] = v; }
+inline void TupleRecord::insert(int tag, Value &&v) { _values[tag] = std::move(v); }
 
 inline void TupleRecord::insert(int tag, TupleRecord &&v)
 {
-    TlvValue val;
+    Value val;
     val.set_ptr(new TupleRecord(std::move(v)), 100);
     _values[tag] = std::move(val);
 }
-inline void TupleRecord::insert(int tag, TlvArray &&v)
+inline void TupleRecord::insert(int tag, Array &&v)
 {
-    TlvValue val;
-    val.set_ptr(new TlvArray(std::move(v)), 101);
+    Value val;
+    val.set_ptr(new Array(std::move(v)), 101);
     _values[tag] = std::move(val);
 }
 
 inline void TupleRecord::insert(int tag,const std::vector<uint8_t>& v)
 {
-    TlvValue val;
+    Value val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
 inline void TupleRecord::insert(int tag, const std::vector<int8_t>& v)
 {
-    TlvValue val;
+    Value val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
-inline const TlvValue *TupleRecord::get(int tag) const
+inline const Value *TupleRecord::get(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -117,13 +117,13 @@ inline const TlvValue *TupleRecord::get(int tag) const
     return &(it->second);
 }
 
-inline const TlvValue& TupleRecord::at(int tag) const
+inline const Value& TupleRecord::at(int tag) const
 {
     return _values.at(tag);
 }
 
 
-inline TlvValue *TupleRecord::get(int tag) 
+inline Value *TupleRecord::get(int tag) 
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -133,7 +133,7 @@ inline TlvValue *TupleRecord::get(int tag)
     return &(it->second);
 }
 
-inline TlvValue& TupleRecord::at(int tag) 
+inline Value& TupleRecord::at(int tag) 
 {
     return _values.at(tag);
 }
@@ -166,4 +166,4 @@ int serialize_array8(uint16_t tag, const std::vector<int64_t> &values, std::vect
 int serialize_array8(uint16_t tag, const std::vector<double> &values, std::vector<uint8_t> &out);
 int serialize_object(uint16_t tag, const std::vector<double> &values, std::vector<uint8_t> &out);
 
-} // namespace tlv
+} // namespace aquadb

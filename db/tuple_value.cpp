@@ -1,5 +1,5 @@
 ﻿#define SPDLOG_TAG "TLV"
-#include "tlv_value.h"
+#include "tuple_value.h"
 #include "key_encoder.h"
 #include "tuple_record.h"
 #include "util/common.h"
@@ -38,20 +38,20 @@ union _tlv_double_helper
 };
 
 /////////////////////////////////////////////////////////////////////
-namespace tlv
+namespace aquadb
 {
 //////////////////////////////////////////////////////////////////////////
 
-TlvValue::TlvValue() : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) {}
-TlvValue::TlvValue(int v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(int64_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(uint64_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(uint32_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(double v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(const std::string &v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
-TlvValue::TlvValue(const char *v, size_t size) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v, size); }
+Value::Value() : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) {}
+Value::Value(int v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(int64_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(uint64_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(uint32_t v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(double v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(const std::string &v) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v); }
+Value::Value(const char *v, size_t size) : _sval(nullptr), _size(0), _dtype(0), _iscopy(0) { set_value(v, size); }
 
-TlvValue::TlvValue(const TlvValue &cv)
+Value::Value(const Value &cv)
 {
     _size  = cv._size;
     _dtype = cv._dtype;
@@ -66,7 +66,7 @@ TlvValue::TlvValue(const TlvValue &cv)
         _iscopy = 0;
     }
 }
-TlvValue::TlvValue(TlvValue &&cv)
+Value::Value(Value &&cv)
 {
     _size  = cv._size;
     _dtype = cv._dtype;
@@ -84,7 +84,7 @@ TlvValue::TlvValue(TlvValue &&cv)
     cv._dtype  = 0;
 }
 
-TlvValue &TlvValue::operator=(const TlvValue &cv)
+Value &Value::operator=(const Value &cv)
 {
     if (this == &cv) {
         return *this;
@@ -107,7 +107,7 @@ TlvValue &TlvValue::operator=(const TlvValue &cv)
     }
     return *this;
 }
-TlvValue &TlvValue::operator=(TlvValue &&cv) noexcept
+Value &Value::operator=(Value &&cv) noexcept
 {
     if (this == &cv) {
         return *this;
@@ -134,9 +134,9 @@ TlvValue &TlvValue::operator=(TlvValue &&cv) noexcept
     return *this;
 }
 
-TlvValue::~TlvValue() { clear(); }
+Value::~Value() { clear(); }
 
-void TlvValue::set_value(const std::string &v)
+void Value::set_value(const std::string &v)
 {
     if (v.size() >= 0x0ffffff) {
         throw std::invalid_argument("string too big");
@@ -161,7 +161,7 @@ void TlvValue::set_value(const std::string &v)
     _dtype = 3;
 }
 
-void TlvValue::set_value(const char *v, size_t size)
+void Value::set_value(const char *v, size_t size)
 {
     if (size >= 0x0ffffff) {
         throw std::invalid_argument("string too big");
@@ -186,7 +186,7 @@ void TlvValue::set_value(const char *v, size_t size)
     _dtype = 3;
 }
 
-int TlvValue::to_int() const
+int Value::to_int() const
 {
     switch (_dtype) {
         case 1:
@@ -200,7 +200,7 @@ int TlvValue::to_int() const
     }
     return 0;
 }
-int64_t TlvValue::to_long() const
+int64_t Value::to_long() const
 {
     switch (_dtype) {
         case 1:
@@ -216,7 +216,7 @@ int64_t TlvValue::to_long() const
 }
 
 /*
-int64_t TlvValue::to_ulong() const
+int64_t Value::to_ulong() const
 {
     switch (_dtype)
     {
@@ -233,7 +233,7 @@ int64_t TlvValue::to_ulong() const
 }
 */
 
-double TlvValue::to_double() const
+double Value::to_double() const
 {
     switch (_dtype) {
         case 1:
@@ -248,7 +248,7 @@ double TlvValue::to_double() const
     }
     return 0.0;
 }
-std::string TlvValue::to_string() const
+std::string Value::to_string() const
 {
     switch (_dtype) {
         case 1:
@@ -263,7 +263,7 @@ std::string TlvValue::to_string() const
     return "";
 }
 
-int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
+int Value::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 {
     int rc            = 0;
     uint8_t wtype     = wrie_type();
@@ -359,7 +359,7 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
                 LOGE("bad dtype:%d for array", dtype());
                 return -1;
             }
-            auto obj = as_object<TlvArray>();
+            auto obj = as_object<Array>();
             rc       = obj->serialize(static_cast<uint16_t>(0), out);
             if (rc != 0) {
                 return rc;
@@ -377,14 +377,14 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
                 return rc;
             }
         } break;
-        case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size +
+        //                          elem_data[n] */
         // break;
-        case TLV_LTYPE_ARRAY4: /* array<int32> or array<uint32> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY4: /* array<int32> or array<uint32> array_size +
+        //                          elem_data[n] */
         // break;
-        case TLV_LTYPE_ARRAY8: /* array<int64> or array<double> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY8: /* array<int64> or array<double> array_size +
+        //                          elem_data[n] */
         // break;
         case TLV_LTYPE_ERROR: /* error type */
             break;
@@ -398,14 +398,14 @@ int TlvValue::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     return 0;
 }
 
-// int TlvValue::deserialize(const std::string &in)
+// int Value::deserialize(const std::string &in)
 //{
 //    uint16_t tag = 0;
 //    BytesBuffer buf(reinterpret_cast<uint8_t*>(const_cast<char*>(in.data())),
 //    in.size()); return deserialize(&buf,tag);
 //}
 
-int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
+int Value::deserialize(BytesBuffer *in, uint16_t &tag)
 {
     uint8_t *data  = reinterpret_cast<uint8_t *>(in->data());
     uint8_t wtype  = TLV_LTYPE_ERROR;
@@ -493,17 +493,17 @@ int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
             pos += sz;
             in->peek(sz);
         } break;
-        case TLV_LTYPE_ARRAY0: /* any type array, array_size + elem_type +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY0: /* any type array, array_size + elem_type +
+        //                          elem_data[n] */
         // break;
-        case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY2: /* array<int16> or array<uint16> array_size +
+        //                          elem_data[n] */
         // break;
-        case TLV_LTYPE_ARRAY4: /* array<int32> or array<uint32> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY4: /* array<int32> or array<uint32> array_size +
+        //                          elem_data[n] */
         // break;
-        case TLV_LTYPE_ARRAY8: /* array<int64> or array<double> array_size +
-                                  elem_data[n] */
+        //case TLV_LTYPE_ARRAY8: /* array<int64> or array<double> array_size +
+        //                          elem_data[n] */
         // break;
         case TLV_LTYPE_OBJECT: /* object object_size + object_data */
         // break;
@@ -517,7 +517,7 @@ int TlvValue::deserialize(BytesBuffer *in, uint16_t &tag)
     return false;
 }
 
-std::ostream &operator<<(std::ostream &oss, const TlvValue &o)
+std::ostream &operator<<(std::ostream &oss, const Value &o)
 {
     if (o.is_none()) {
         oss << "<none>";
@@ -540,4 +540,4 @@ std::ostream &operator<<(std::ostream &oss, const TlvValue &o)
     return oss;
 }
 
-} // namespace tlv
+} // namespace aquadb

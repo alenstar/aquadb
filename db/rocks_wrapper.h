@@ -28,7 +28,7 @@
 #include "common.h"
 //#include "proto/store.interface.pb.h"
 
-namespace tdb {
+namespace aquadb {
 
 enum KVMode {
     KEY_ONLY,

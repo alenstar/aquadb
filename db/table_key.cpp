@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mut_table_key.h"
 #include "table_key.h"
+#include "mut_table_key.h"
 
-namespace tlv {
+namespace aquadb{
 
-MutTableKey::MutTableKey(const TableKey& key) : 
+TableKey::TableKey(const MutTableKey& key) : 
         _full(key.get_full()),
-        _data(key.data().c_str(), key.size()) {}
+        _data(key.data().data()) {}
 
-MutTableKey& MutTableKey::append_index(const TableKey& key) {
-    _data.append(key.data().c_str(), key.size());
-    return *this;
-}
 
-} // end of namespace tlv
+
+
+} // end of namespace aquadb

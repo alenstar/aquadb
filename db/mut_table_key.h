@@ -17,7 +17,7 @@
 #include "key_encoder.h"
 #include "str.h"
 
-namespace tlv {
+namespace aquadb {
 
 class TableKey;
 class MutTableKey {

@@ -17,7 +17,7 @@
 #include "rocks_wrapper.h"
 #include <butil/time.h>
 
-namespace tdb {
+namespace aquadb {
 
 class TimeCost {
 public:
@@ -192,4 +192,4 @@ private:
 };
 
 } // namespace myrocksdb
-} // namespace tdb
+} // namespace aquadb

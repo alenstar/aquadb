@@ -15,7 +15,7 @@
 #include "my_rocksdb.h"
 //#include "qos.h"
 
-namespace tdb {
+namespace aquadb {
 
 namespace myrocksdb {
 
@@ -221,4 +221,4 @@ rocksdb::Status Transaction::Put(rocksdb::ColumnFamilyHandle* column_family, con
 }
 
 } // namespace myrocksdb
-} // namespace tdb
+} // namespace aquadb

@@ -9,26 +9,28 @@
 #    add_subdirectory(${subdir})
 #ENDFOREACH()
 
-set(LIB_NAME tdb)
+set(LIB_NAME aquadb)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(LIB_TLV_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 #file(GLOB_RECURSE LIB_STORAGE_INC ${CMAKE_CURRENT_SOURCE_DIR}/include/storage *.h)
 #file(GLOB_RECURSE LIB_STORAGE_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
-file(GLOB_RECURSE LIB_INC  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h)
+file(GLOB_RECURSE LIB_INC  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h *.hpp *.hxx)
+
+set(LIB_BASE_SRC tuple_value.cpp varint.c mut_table_key.cpp table_key.cpp tuple_record.cpp table_info.cpp str.cpp)
 
 #add_subdirectory(src)
 
-set(LIB_SRC tdb.cpp tbl.cpp)
+set(LIB_SRC db.cpp table.cpp)
 
-add_library(${LIB_NAME} ${LIB_SRC} ${LIB_INC})
-add_dependencies(${LIB_NAME} util lmdb)
+add_library(${LIB_NAME} ${LIB_BASE_SRC} ${LIB_SRC} ${LIB_INC})
+add_dependencies(${LIB_NAME} util)
 
-set(APP_NAME tdb_example)
+set(APP_NAME db_example)
 add_executable(${APP_NAME} example.cpp)
 add_dependencies(${APP_NAME} ${LIB_NAME})
-target_link_libraries(${APP_NAME} ${LIB_NAME} lmdb util db ${SYS_LIBS})
+target_link_libraries(${APP_NAME} ${LIB_NAME} util db ${SYS_LIBS})
 message("LINK: ${SYS_LIBS}")
 
 #target_include_directories(${APP_NAME} PUBLIC ../src)

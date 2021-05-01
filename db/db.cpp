@@ -2,13 +2,13 @@
 #include <db.h>
 #include "util/FileUtil.h"
 #include "util/logdef.h"
-#include "tdb.h"
+#include "db.h"
 
 DBManager::DBManager() {}
 DBManager::~DBManager()
 {
     if (_env) {
-        mdb_env_close(_env);
+        //mdb_env_close(_env);
         _env = nullptr;
     }
 }

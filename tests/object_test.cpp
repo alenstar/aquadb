@@ -3,19 +3,19 @@
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
-#include "tlv/tuple_record.h"
+#include "db/tuple_record.h"
 #include "util/logdef.h"
 
-using namespace tlv;
+using namespace aquadb;
 
 TEST_CASE("testing the tlv_object") {
     TupleRecord obj;
-    TlvValue a(1);
-    TlvValue b(9889878);
-    TlvValue c(0);
-    TlvValue d(-1);
-    TlvValue e(12.443);
-    TlvValue f("hello world!");
+    Value a(1);
+    Value b(9889878);
+    Value c(0);
+    Value d(-1);
+    Value e(12.443);
+    Value f("hello world!");
     obj.insert(1, a);
     obj.insert(2, b);
     obj.insert(3, c);

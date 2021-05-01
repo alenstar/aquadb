@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-namespace tlv {
+namespace aquadb {
 const uint16_t SIGN_MASK_08 = 0x80;
 const uint16_t SIGN_MASK_16 = 0x8000;
 const uint32_t SIGN_MASK_32 = 0x80000000;
@@ -155,4 +155,4 @@ public:
         return *reinterpret_cast<double*>(&in);
     }
 };
-} // tlv
+} // 

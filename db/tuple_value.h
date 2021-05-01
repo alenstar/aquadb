@@ -17,9 +17,9 @@
 #include <cstring>
 #include <cstdio>
 
-#include "tlv_types.h"
+#include "data_types.h"
 
-namespace tlv
+namespace aquadb
 {
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -48,62 +48,62 @@ class BytesBuffer
  * @brief 单元值
  *
  */
-class TlvValue
+class Value
 {
 public:
     /**
      * @brief 构造空对象
      *
      */
-    TlvValue();
+    Value();
     
     /**
      * @brief 使用整型构造对象
      *
      * @param v
      */
-    TlvValue(int v);
+    Value(int v);
     
     /**
      * @brief 使用长整型构造对象
      *
      * @param v
      */
-    TlvValue(int64_t v);
-    TlvValue(uint64_t v);
+    Value(int64_t v);
+    Value(uint64_t v);
 
     /**
      * @brief 使用无符号整型构造对象
      *
      * @param v
      */
-    TlvValue(uint32_t v);
+    Value(uint32_t v);
     
     /**
      * @brief 使用浮点数构造对象
      *
      * @param v
      */
-    TlvValue(double v);
+    Value(double v);
     
     /**
      * @brief 使用字符串构造对象
      *
      * @param v
      */
-    TlvValue(const std::string &v);
+    Value(const std::string &v);
 
-    TlvValue(const char* v, size_t size);
+    Value(const char* v, size_t size);
     
-    TlvValue(const TlvValue &cv);
+    Value(const Value &cv);
     
-    TlvValue(TlvValue &&cv);
+    Value(Value &&cv);
     
-    TlvValue &operator=(const TlvValue &cv);
+    Value &operator=(const Value &cv);
     
-    TlvValue &operator=(TlvValue &&cv) noexcept;
+    Value &operator=(Value &&cv) noexcept;
     
-    ~TlvValue();
+    ~Value();
     
     /**
      * @brief 清空对象
@@ -232,7 +232,7 @@ public:
      */
     bool is_string() const;
     
-    friend std::ostream &operator<<(std::ostream &oss, const TlvValue &o);
+    friend std::ostream &operator<<(std::ostream &oss, const Value &o);
 
     uint8_t wrie_type() const;
 
@@ -264,7 +264,7 @@ private:
     uint32_t _iscopy: 1;           // the string is copy, need free
 };
 
-inline void TlvValue::clear()
+inline void Value::clear()
 {
     if (_iscopy)
     {
@@ -276,12 +276,12 @@ inline void TlvValue::clear()
     _sval = nullptr;
 }
 
-// inline const std::string& TlvValue::get_string() const {return _value;}
-inline int TlvValue::dtype() const
+// inline const std::string& Value::get_string() const {return _value;}
+inline int Value::dtype() const
 {
     return _dtype;
 }
-inline uint8_t TlvValue::wrie_type() const
+inline uint8_t Value::wrie_type() const
 {
     switch (_dtype) {
     case 0:
@@ -333,7 +333,7 @@ inline uint8_t TlvValue::wrie_type() const
     }
 }
 
-inline const char *TlvValue::c_str() const
+inline const char *Value::c_str() const
 {
     if (_iscopy)
     {
@@ -345,12 +345,12 @@ inline const char *TlvValue::c_str() const
     }
 }
 
-inline const char *TlvValue::data() const
+inline const char *Value::data() const
 {
     return c_str();
 }
 
-inline size_t TlvValue::size() const
+inline size_t Value::size() const
 {
     if (_dtype == 3)
     {
@@ -363,28 +363,28 @@ inline size_t TlvValue::size() const
     return 8;
 }
 
-inline void TlvValue::set_value(double v)
+inline void Value::set_value(double v)
 {
     clear();
     _dtype = 1;
     _fval = v;
 }
 
-inline void TlvValue::set_value(int v)
+inline void Value::set_value(int v)
 {
     clear();
     _dtype = 2;
     _ival = v;
 }
 
-inline void TlvValue::set_value(int64_t v)
+inline void Value::set_value(int64_t v)
 {
     clear();
     _dtype = 2;
     _ival = v;
 }
 
-inline void TlvValue::set_value(uint64_t v)
+inline void Value::set_value(uint64_t v)
 {
     clear();
     _dtype = 2;
@@ -392,34 +392,34 @@ inline void TlvValue::set_value(uint64_t v)
     _ival = static_cast<int64_t>(v);
 }
 
-inline void TlvValue::set_value(uint32_t v)
+inline void Value::set_value(uint32_t v)
 {
     clear();
     _dtype = 2;
     _ival = v;
 }
 
-inline bool TlvValue::is_none() const
+inline bool Value::is_none() const
 {
     return _dtype == 0;
 }
 
-inline bool TlvValue::is_double() const
+inline bool Value::is_double() const
 {
     return _dtype == 1;
 }
 
-inline bool TlvValue::is_long() const
+inline bool Value::is_long() const
 {
     return _dtype == 2;
 }
 
-inline bool TlvValue::is_string() const
+inline bool Value::is_string() const
 {
     return _dtype == 3;
 }
 
-inline bool operator<(const TlvValue &left, const TlvValue &right)
+inline bool operator<(const Value &left, const Value &right)
 {
     if (left.dtype() == right.dtype())
     {
@@ -439,7 +439,7 @@ inline bool operator<(const TlvValue &left, const TlvValue &right)
     throw std::logic_error("dtype mismatch");
 }
 
-inline bool operator>(const TlvValue &left, const TlvValue &right)
+inline bool operator>(const Value &left, const Value &right)
 {
     if (left.dtype() == right.dtype())
     {
@@ -459,7 +459,7 @@ inline bool operator>(const TlvValue &left, const TlvValue &right)
     throw std::logic_error("dtype mismatch");
 }
 
-inline bool operator==(const TlvValue &left, const TlvValue &right)
+inline bool operator==(const Value &left, const Value &right)
 {
     if (left.dtype() == right.dtype())
     {
@@ -479,7 +479,7 @@ inline bool operator==(const TlvValue &left, const TlvValue &right)
     return false;
 }
 
-inline bool operator!=(const TlvValue &left, const TlvValue &right)
+inline bool operator!=(const Value &left, const Value &right)
 {
     if (left.dtype() == right.dtype())
     {

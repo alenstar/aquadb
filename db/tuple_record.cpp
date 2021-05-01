@@ -1,19 +1,19 @@
 #define SPDLOG_TAG "TLV"
 #include "tuple_record.h"
-#include "tlv_value.h"
+#include "tuple_value.h"
 #include "util/common.h"
 #include "util/logdef.h"
 #include "varint.h"
 #include <string.h>
 
-namespace tlv
+namespace aquadb
 {
 
-TlvArray::TlvArray() {}
+Array::Array() {}
 
-TlvArray::TlvArray(TlvArray &&a) { _values = std::move(a._values); }
+Array::Array(Array &&a) { _values = std::move(a._values); }
 
-TlvArray::~TlvArray()
+Array::~Array()
 {
     for (auto v : _values)
     {
@@ -25,7 +25,7 @@ TlvArray::~TlvArray()
         }
         else if (v.dtype() == 101)
         {
-            auto p = v.as_object<TlvArray>();
+            auto p = v.as_object<Array>();
             delete p;
             v.clear();
         }
@@ -33,7 +33,7 @@ TlvArray::~TlvArray()
     _values.clear();
 }
 
-int TlvArray::serialize(uint16_t tag, std::vector<uint8_t> &out) const
+int Array::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 {
     if (_values.empty())
     {
@@ -93,7 +93,7 @@ int TlvArray::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         break;
         case 101: // array
         {
-            auto obj = v.as_object<TlvArray>();
+            auto obj = v.as_object<Array>();
             obj->serialize(static_cast<uint16_t>(0), out);
         }
         break;
@@ -124,7 +124,7 @@ int TlvArray::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     }
     return 0;
 }
-int TlvArray::deserialize(const std::string &in) const
+int Array::deserialize(const std::string &in) const
 {
     // TODO
     uint16_t tag = 0;
@@ -132,7 +132,7 @@ int TlvArray::deserialize(const std::string &in) const
     return deserialize(&buf, tag);
 }
 
-int TlvArray::deserialize(BytesBuffer *in, uint16_t &tag) const
+int Array::deserialize(BytesBuffer *in, uint16_t &tag) const
 {
     // TODO
     return -1;
@@ -153,7 +153,7 @@ TupleRecord::~TupleRecord()
         }
         else if (v.second.dtype() == 101)
         {
-            auto p = v.second.as_object<TlvArray>();
+            auto p = v.second.as_object<Array>();
             delete p;
             v.second.clear();
         }
@@ -225,7 +225,7 @@ int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         break;
         case 101: // array
         {
-            auto arr = v.second.as_object<TlvArray>();
+            auto arr = v.second.as_object<Array>();
             rc = arr->serialize(static_cast<uint16_t>(v.first), out);
             if (rc != 0)
             {
@@ -301,7 +301,7 @@ int TupleRecord::deserialize(BytesBuffer *in, uint16_t &tag)
     int rc = 0;
     while (in->size())
     {
-        TlvValue value;
+        Value value;
         uint16_t subtag = 0;
         rc = value.deserialize(in, subtag);
         if (rc != 0)
@@ -331,7 +331,7 @@ int serialize_bytes(uint16_t tag, const char *values, size_t size,  std::vector<
         // 空对象不编码
         return 0;
     }
-    uint8_t wtype = TLV_LTYPE_BYTES;
+    //uint8_t wtype = TLV_LTYPE_BYTES;
     char taglen[2] = {0x00};
     // TODO
     return -1;
@@ -344,7 +344,7 @@ int serialize_array2(uint16_t tag, const std::vector<int16_t> &values,  std::vec
         // 空对象不编码
         return 0;
     }
-    uint8_t wtype = TLV_LTYPE_ARRAY2;
+    //uint8_t wtype = TLV_LTYPE_ARRAY2;
     char taglen[2] = {0x00};
     // TODO
     return -1;
@@ -364,4 +364,4 @@ int serialize_array8(uint16_t tag, const std::vector<double> &values,  std::vect
 
 int serialize_object(uint16_t tag, const std::vector<double> &values,  std::vector<uint8_t> &out) { return -1; }
 
-} // namespace tlv
+} // namespace aquadb

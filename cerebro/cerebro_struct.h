@@ -396,6 +396,48 @@ struct CerebroComponent
     const std::pair<int,int>* contain(int date) const; // 日期在组合内
 };
 
+
+struct CerebroConfig
+{
+  std::string name; // 账户名
+  int64_t aid = 0; // 账户ID
+  int64_t strategyid; // 策略ID，一个策略一个账户ID，（后续可以支持一个策略用不同账户ID来下单）, 一个账户ID可以在多个策略中使用
+  double cash = 1000000;// 初始资金， 金回测用
+  double comm_rate = 0.0003; //手续费
+  double slippage = 1.0; // 滑点
+
+  int start_date; // 回测起始日期
+  int end_date;// 回测截至日期
+};
+
+// 数据推送
+// 订阅时间点，按时间点取数据并推送
+// 并提供获取数据的接口
+class CerebroDataFeed
+{
+  public:
+    CerebroDataFeed();
+    ~CerebroDataFeed();
+    int get_kline(const Symbol &symbol, int date, CerebroKlineRecord &record);
+    int get_tick(const Symbol &symbol, int date, CerebroTickRecord &record);
+    // 获取数据序列
+    int get_data_series(const Symbol &symbol, int date, int num, const std::string& fields, std::map<std::string, CerebroSeriesValue>& values);
+    // 获取数据截面
+    int get_data_section(const std::vector<Symbol>& symbols, int date, const std::string& fields, std::map<std::string, CerebroSectionValue>& values);
+    // 获取数据表
+    int get_data_table(const Symbol& symbols, int date, int num, const std::string& tblname);
+    // 获取成份数据
+    int get_component(const Symbol &index, std::map<Symbol, CerebroComponent>& component);
+
+    // 判断ST
+    bool is_st(const Symbol &symbol, int date) const;
+    // 判断停牌
+    bool is_stop( const Symbol &symbol, int date) const;
+
+    // 接受时间点事件
+    int on_timepoint();
+};
+
 class CerebroEvent
 {
   public:
@@ -410,9 +452,10 @@ class CerebroEvent
         AFT_MARKET_SETTLE = 2, // 盘后结算
         MARKET_FINISH = 2,     // 结束
         TIMEPOINT_ARRIVE = 5, // 时间点到达，用于驱动回测流程(预先将时间按回测周期切片，然后一次灌入事件引擎)
+        MAREKT_QUOTE_DATA = 7, // 市场行情数据, tick minute daily ...
 
-        ORDER_UPDATE = 6,
-        // ORDER_UPDATE = 6,
+        ORDER_UPDATE = 7,
+        // ORDER_UPDATE = 8,
     };
 
     CerebroEvent(EventCode code, int type, void *data) : _code(code), _type(type), _user_data(data) {}
@@ -447,9 +490,14 @@ class CerebroEventStream
         for (int dt = start_dt; dt <= end_dt; ++dt)
         {
             // 调整时间点, 发生时间点到达事件
-            _events.emplace_back(CerebroEvent(CerebroEvent::TIMEPOINT_ARRIVE, 0, nullptr));
             // 日线每天发一次
             // 分钟线按交易事件短分片后发送
+            // tick
+            //_events.emplace_back(CerebroEvent(CerebroEvent::TIMEPOINT_ARRIVE, 0, nullptr));
+            // minute
+            //_events.emplace_back(CerebroEvent(CerebroEvent::TIMEPOINT_ARRIVE, 0, nullptr));
+            // daily
+            _events.emplace_back(CerebroEvent(CerebroEvent::TIMEPOINT_ARRIVE, 0, nullptr));
         }
         _events.emplace_back(CerebroEvent(CerebroEvent::MARKET_CLOSE, 0, nullptr));
         _events.emplace_back(CerebroEvent(CerebroEvent::AFT_MARKET_SETTLE, 0, nullptr));
@@ -474,6 +522,7 @@ class CerebroEventSink
     virtual void on_aft_market_settle() = 0; // 触发broker处理结算事务
     virtual void on_tick() = 0;  // 加载tick缓存， 触发用户业务回调on_tick，再触发broker撮合
     virtual void on_kline() = 0; // 根据时间点加载k线缓存，再处理用户业务回调on_kline
+    virtual void on_market_quote_data() = 0; // 市场行情数据, 所有行情数据tick,minute,daily都先经过此函数再到on_tick,on_kline
 };
 
 class CerebroEngine
@@ -482,8 +531,12 @@ class CerebroEngine
     CerebroEngine();
     ~CerebroEngine();
     int init();
-    int set_broker(CerebroBroker *broker);
-    int set_datafeed(CerebroDataFeed *feed);
+    int set_broker(CerebroBroker *broker)
+     {_broker = broker; return 0;}
+    int set_datafeed(CerebroDataFeed *feed)
+     {_feed= feed; return 0;}
+    int set_stream(CerebroEventStream *stream)
+     {_stream = stream; return 0;}
 
     void pump(CerebroEvent &ev); // 外部导入事件，模拟盘or实盘用
     CerebroEvent *poll()         // 轮询事件，有事件到达时返回
@@ -493,6 +546,10 @@ class CerebroEngine
     CerebroEvent *run_once() // 处理一次事件
     {
         auto ev = _stream->pop();
+        if(ev == nullptr)
+        {
+          return ev;
+        }
         switch (ev->code())
         {
         case CerebroEvent::PRE_MARKET_OPEN /* constant-expression */:
@@ -508,16 +565,23 @@ class CerebroEngine
             /* code */
             _sink->on_market_open();
             break;
-
+        case CerebroEvent::MAREKT_QUOTE_DATA:
+            //_sink->on_tick();
+            _sink->on_market_quote_data();
         default:
             break;
         }
-        return nullptr;
+        return ev;
+    }
+
+    void run()
+    {
+      while(run_once());
     }
 
   private:
     CerebroEvent *_event{nullptr}; // 记录当前事件
-
+    CerebroDataFeed* _feed{nullptr};
     CerebroEventStream *_stream{nullptr}; // 事件流
     CerebroEventSink *_sink{nullptr};     // 消费事件
     CerebroBroker *_broker{nullptr};      // 订单管理撮合, 持仓管理，帐号管理

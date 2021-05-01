@@ -17,7 +17,7 @@
 #include "key_encoder.h"
 #include "str.h"
 
-namespace tlv{
+namespace aquadb{
 inline int end_key_compare(const Str& key1, const Str& key2) {
     if (key1 == key2) {
         return 0;

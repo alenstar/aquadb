@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1.12 FATAL_ERROR)
-project(tlv_box)
+project(AquaDB)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 message("CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}")
 
@@ -216,7 +216,7 @@ ${PROJECT_BINARY_DIR}
 ${PROJECT_SOURCE_DIR}/thirdparty
 ${PROJECT_SOURCE_DIR}/thirdparty/doctest
 ${PROJECT_SOURCE_DIR}/thirdparty/lmdb
-${PROJECT_SOURCE_DIR}/tlv)
+${PROJECT_SOURCE_DIR}/db)
 
 
 include_directories(${PROJECT_INCS})
@@ -230,10 +230,9 @@ else()
 set(SYS_LIBS z rt dl pthread)
 endif()
 
-add_subdirectory(thirdparty/lmdb)
-add_subdirectory(tdb)
+#add_subdirectory(thirdparty/lmdb)
+add_subdirectory(db)
 add_subdirectory(util)
-add_subdirectory(tlv)
 add_subdirectory(cerebro)
 add_subdirectory(tests)
 

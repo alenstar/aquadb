@@ -1,10 +1,10 @@
 #include "table_info.h"
 
 
-namespace tlv
+namespace aquadb
 {
 
-inline int append_value(const TlvFieldInfo *field, const TlvValue *v, MutTableKey &key)
+inline int append_value(const FieldDescriptor *field, const Value *v, MutTableKey &key)
 {
     auto type = static_cast<MysqlType>(field->ptype());
     switch (type) {
@@ -46,9 +46,9 @@ inline int append_value(const TlvFieldInfo *field, const TlvValue *v, MutTableKe
     return 0;
 }
 // 获取索引key
-int TlvTableInfo::get_index_key(const std::vector<int> &fields, TupleRecord &obj, MutTableKey &key)
+int TableDescriptor::get_index_key(const std::vector<int> &fields, TupleRecord &obj, MutTableKey &key)
 {
-    std::vector<const TlvFieldInfo *> infos;
+    std::vector<const FieldDescriptor *> infos;
     int rc = get_index_key_info(fields, infos);
     for (auto i : infos) {
         auto v = obj.get(i->id);
@@ -61,10 +61,10 @@ int TlvTableInfo::get_index_key(const std::vector<int> &fields, TupleRecord &obj
     return 0;
 }
 // 获取主键key
-int TlvTableInfo::get_primary_key(TupleRecord &obj,MutTableKey &key)
+int TableDescriptor::get_primary_key(TupleRecord &obj,MutTableKey &key)
 {
 
-    std::vector<const TlvFieldInfo *> infos;
+    std::vector<const FieldDescriptor *> infos;
     int rc = get_primary_key_info(infos);
     for (auto i : infos) {
         auto v = obj.get(i->id);

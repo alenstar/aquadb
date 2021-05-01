@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include "tlv/table_info.h"
+#include "table_info.h"
 
 class TableCursor
 {

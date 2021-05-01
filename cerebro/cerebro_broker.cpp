@@ -1,4 +1,5 @@
 #include "cerebro_broker.h"
+#include <algorithm>
 
 
 inline POSITION_DIRECTION order_longshort(const CerebroOrder &order)
@@ -406,6 +407,21 @@ int CerebroSZSEMatcher::match(CerebroOrder &order, const CerebroTickRecord &tick
     return -1;
 }
 
+
+int CerebroBroker::init(const CerebroConfig& conf)
+{
+    if(_account)
+    {
+        delete _account;
+    }
+    _account = new CerebroAccountWrap(conf.aid, conf.name);
+    _account->set_cash(conf.cash);
+    _account->set_commission_rate(conf.comm_rate);
+    _account->set_slippage(conf.slippage);
+    return 0;
+}
+
+
 void CerebroBroker::process_special_order(const CerebroOrder &order)
 {
     // 处理特殊订单， 例如： 分红送红股，入金等
@@ -429,7 +445,11 @@ void CerebroBroker::process_special_order(const CerebroOrder &order)
         break;
     }
 }
-void CerebroBroker::add_order(const CerebroOrder &order) { _orders.push_back(order); }
+
+void CerebroBroker::add_order(const CerebroOrder &order) 
+{
+    _unfill_orders.push_back(order); 
+}
 
 void CerebroBroker::on_order_update(const CerebroOrder &order)
 {
@@ -549,8 +569,10 @@ int64_t CerebroBroker::cancel_order(int64_t order_id)
 
 void CerebroBroker::on_tick(const CerebroTickRecord &record) // 接收tick时间，触发订单撮合
 {
+    std::set<int64_t> oids; // 记录已成订单id
+    std::vector<CerebroOrder> neworders; // 新订单，部成时产生的子单
     // TODO
-    for (auto &o : _orders)
+    for (auto &o : _unfill_orders)
     {
         if (o.status == ORDER_STATUS::REJECTED || o.status == ORDER_STATUS::FILLED)
         {
@@ -581,6 +603,8 @@ void CerebroBroker::on_tick(const CerebroTickRecord &record) // 接收tick时间
         {
             // 从队列移除完成的订单
             // TODO
+            oids.insert(o.order_id);
+            _filled_orders.push_back(o);
         }
 
         if (util::almost_eq(o.unfilled_quantity, 0.0))
@@ -601,7 +625,14 @@ void CerebroBroker::on_tick(const CerebroTickRecord &record) // 接收tick时间
             suborder.transaction_cost = 0.0;
             suborder.ctime = 0; // 创建时间
             suborder.mtime = 0;
-            add_order(suborder);
+            neworders.emplace_back(suborder);
+            //add_order(suborder);
         }
     }
+    _unfill_orders.erase(std::remove_if(_unfill_orders.begin(), _unfill_orders.end(), [&oids](CerebroOrder& o){ return oids.find(o.order_id) != oids.cend();}), _unfill_orders.end());
+    for(auto & o: neworders)
+    {
+        _unfill_orders.push_back(o);
+    }
+
 }

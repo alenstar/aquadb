@@ -16,9 +16,7 @@
 #define TLV_LTYPE_FLOAT64 0x09U /* double */
 #define TLV_LTYPE_BYTES 0x0aU /* bytes or array<uint8>, array<int8> string (non-terminal '\0' ) */
 #define TLV_LTYPE_ARRAY0 0x0bU /* any type array, array_size + elem[elem_type + elem_data, ...] */
-#define TLV_LTYPE_ARRAY2 0x0cU /* array<int16> or array<uint16> array_size + elem_data[n] */
-#define TLV_LTYPE_ARRAY4 0x0dU /* array<int32> or array<uint32> array_size + elem_data[n] */
-#define TLV_LTYPE_ARRAY8 0x0eU /* array<int64> or array<double> array_size + elem_data[n] */
+#define TLV_LTYPE_ARRAYN 0x0cU /* any pod type array, array_size + elem_type + elem[elem_data, ...] */
 #define TLV_LTYPE_OBJECT 0x0fU /* object object_size + object_data */
 #define TLV_LTYPE_ERROR 0xffu /* error type */
 
@@ -53,7 +51,7 @@
 // 2021 - 2047 扩展使用
 
 
-namespace tlv
+namespace aquadb
 {
 enum MysqlType : uint8_t { 
     MYSQL_TYPE_DECIMAL,   // 0
