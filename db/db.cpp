@@ -1,6 +1,6 @@
 #include <iostream>
 #include <db.h>
-#include "util/FileUtil.h"
+#include "util/fileutil.h"
 #include "util/logdef.h"
 #include "db.h"
 

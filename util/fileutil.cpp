@@ -16,8 +16,8 @@
 #include "common.h"
 #include "commonfuncs.h"
 #include "commontypes.h"
-#include "FileStream.h"
-#include "FileUtil.h"
+#include "filestream.h"
+#include "fileutil.h"
 #include "logdef.h"
 
 #ifdef _WIN32

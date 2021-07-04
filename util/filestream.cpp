@@ -1,7 +1,7 @@
-#include "FileStream.h"
-#include "Buffer.h"
+#include "filestream.h"
+#include "buffer.h"
 #include "logdef.h"
-#include "Stream.h"
+#include "stream.h"
 #include <memory>
 #include <string>
 

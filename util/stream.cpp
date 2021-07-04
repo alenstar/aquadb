@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "Buffer.h"
-#include "Stream.h"
+#include "buffer.h"
+#include "stream.h"
 
 namespace Streams {
 

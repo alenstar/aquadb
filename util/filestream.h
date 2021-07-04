@@ -1,6 +1,5 @@
-#ifndef STREAMS_FILESTREAM_H_
-#define STREAMS_FILESTREAM_H_
-#include "Stream.h"
+#pragma once
+#include "stream.h"
 namespace Streams {
 
 class FileStream : public Stream {
@@ -54,4 +53,3 @@ typedef std::shared_ptr<FileStream> FileStreamPtr;
 
 } /* namespace Streams */
 
-#endif /* STREAMS_FILESTREAM_H__ */

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <string>
 
-#include "Buffer.h"
+#include "buffer.h"
 
 namespace Streams {
 

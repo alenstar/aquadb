@@ -11,7 +11,7 @@
 namespace fs = std::experimental::filesystem;
 #define HAS_STD_FILESYSTEM
 #else
-#include "FileUtil.h"
+#include "fileutil.h"
 #include <cstring>
 #endif
 

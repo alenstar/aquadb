@@ -1,5 +1,4 @@
-#ifndef AEON_STREAMS_BUFFER_H_
-#define AEON_STREAMS_BUFFER_H_
+#pragma once
 #include <iostream>
 #include <memory>
 namespace Streams
@@ -107,4 +106,3 @@ typedef std::shared_ptr<Buffer> BufferPtr;
 
 } /* namespace Streams */
 
-#endif /* AEON_STREAMS_BUFFER_H__ */

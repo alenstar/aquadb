@@ -1,6 +1,5 @@
-#ifndef AEON_STREAMS_STREAM_H_
-#define AEON_STREAMS_STREAM_H_
-#include "Buffer.h"
+#pragma once
+#include "buffer.h"
 #define AEON_STREAMS_MAX_TEXT_LINE_LENGTH ( 2048 )
 #define AEON_STREAMS_DEFAULT_STREAM_NAME "Stream"
 namespace Streams {
@@ -257,4 +256,3 @@ typedef std::shared_ptr<Stream> StreamPtr;
 
 } /* namespace Streams */
 
-#endif /* AEON_STREAMS_STREAM_H__ */

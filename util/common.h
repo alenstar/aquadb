@@ -102,7 +102,7 @@ struct CrtDebugBreak {
 #include <iomanip>
 #include <algorithm>
 
-#if 0
+/*
 #include <absl/strings/string_view.h>
 #include <absl/strings/charconv.h>
 #include <absl/strings/str_format.h>
@@ -110,7 +110,7 @@ struct CrtDebugBreak {
 #include <absl/types/any.h>
 #include <absl/time/time.h>
 #include <absl/time/civil_time.h>
-#endif
+*/
 
 namespace util {
 // using std::string;
@@ -143,7 +143,7 @@ inline void msleep( long long msec )
     std::this_thread::sleep_for(std::chrono::milliseconds(msec));
 }
 
-#if 0
+/*
 inline int ToDateInt(absl::Time t, bool utc=false)
 {
    auto cd = absl::ToCivilDay(t, utc?absl::UTCTimeZone(): absl::LocalTimeZone());
@@ -160,7 +160,7 @@ inline absl::Time FromDateInt(int dt, bool utc=false)
     int d = dt - y *10000 - m*100;
     return absl::FromCivil(absl::CivilDay(y,m, d), utc ? absl::UTCTimeZone(): absl::LocalTimeZone());
 }
-#endif
+*/
 
 template<typename T>
 bool almost_eq(T x, T y, int ulp = 6)
@@ -240,7 +240,7 @@ bool almost_ge(T x, T y, int ulp = 6)
     }
 }
 
-#if 0
+/*
 class StringSplit
 {
 public:
@@ -330,7 +330,7 @@ public:
 private:
     absl::string_view _sv;
 };
-#endif
+*/
 
 /**
  * @brief  基础工具类，提供了一些非常基本的函数使用.
