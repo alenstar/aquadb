@@ -1,6 +1,10 @@
 #pragma once
 #include <memory>
-#include "table_info.h"
+#include "descriptor.h"
+
+namespace aquadb
+{
+
 
 class TableCursor
 {
@@ -42,7 +46,12 @@ class TableWriter
     int remove(const std::vector<TableRecord>& records);
     int remove(const TableRecord& start_record, const TableRecord& end_record);
 
+    private:
+    std::string name;
+    TableDescriptor* _descriptor;
 };
+typedef std::shared_ptr<TableWriter> TableWriterPtr;
+
 class TableReader
 {
     public:
@@ -59,3 +68,6 @@ class TableReader
     private:
     std::string name;
 };
+typedef std::shared_ptr<TableReader> TableReaderPtr;
+
+}

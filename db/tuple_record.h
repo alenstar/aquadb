@@ -11,7 +11,7 @@ namespace aquadb
 
 // class Value;
 class TupleRecord;
-// class BytesBuffer;
+// class BufferView;
 
 class Array
 {
@@ -26,7 +26,7 @@ class Array
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
     int deserialize(const std::vector<uint8_t> &in) ;
     int deserialize(const std::string &in) ;
-    int deserialize(BytesBuffer *in, uint16_t &tag) ;
+    int deserialize(BufferView *in, uint16_t &tag) ;
 
   private:
     std::vector<Value> _values;
@@ -51,7 +51,8 @@ class TupleRecord
      */
     int deserialize(const std::string &in);
     int deserialize(const std::vector<uint8_t> &in);
-    int deserialize(BytesBuffer *in, uint16_t &tag);
+    int deserialize(BufferView& in);
+    int deserialize(BufferView *in, uint16_t &tag);
 
     // tag range in [0,2047]
     void insert(int tag, const Value &v);

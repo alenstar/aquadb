@@ -65,9 +65,10 @@ std::atomic<int64_t> RocksWrapper::data_cf_remove_range_count = {0};
 std::atomic<int64_t> RocksWrapper::mata_cf_remove_range_count = {0};
 
 RocksWrapper::RocksWrapper() : _is_init(false), _txn_db(nullptr)
+/*
     , _raft_cf_remove_range_count("raft_cf_remove_range_count")
     , _data_cf_remove_range_count("data_cf_remove_range_count")
-    , _mata_cf_remove_range_count("mata_cf_remove_range_count") {
+    , _mata_cf_remove_range_count("mata_cf_remove_range_count") */ {
 }
 int32_t RocksWrapper::init(const std::string& path) {
     if (_is_init) {
@@ -312,13 +313,13 @@ rocksdb::Status RocksWrapper::remove_range(const rocksdb::WriteOptions& options,
     auto data_cf = get_data_handle();
     auto mata_cf = get_meta_info_handle();
     if (raft_cf != nullptr && column_family->GetID() == raft_cf->GetID()) {
-        _raft_cf_remove_range_count << 1;
+        //_raft_cf_remove_range_count << 1;
         raft_cf_remove_range_count++;
     } else if (data_cf != nullptr && column_family->GetID() == data_cf->GetID()) {
-        _data_cf_remove_range_count << 1;
+        //_data_cf_remove_range_count << 1;
         data_cf_remove_range_count++;
     } else if (mata_cf != nullptr && column_family->GetID() == mata_cf->GetID()) {
-        _mata_cf_remove_range_count << 1;
+        //_mata_cf_remove_range_count << 1;
         mata_cf_remove_range_count++;
     }
     if (delete_files_in_range) {

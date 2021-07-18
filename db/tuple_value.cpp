@@ -148,7 +148,8 @@ void Value::set_value(const std::string &v)
     _sval = nullptr;
 
     if (v.size() < (sizeof(int64_t) + sizeof(int32_t))) {
-        memcpy(_buffer, v.data(), v.size() + 1);
+        memcpy(_buffer, v.data(), v.size());
+        _buffer[v.size()] = '\0';
         _isowner = 0;
     }
     else {
@@ -173,7 +174,8 @@ void Value::set_value(const char *v, size_t size)
     _sval = nullptr;
 
     if (size < (sizeof(int64_t) + sizeof(int32_t))) {
-        memcpy(_buffer, v, size + 1);
+        memcpy(_buffer, v, size);
+        _buffer[size] = '\0';
         _isowner = 0;
     }
     else {
@@ -186,15 +188,29 @@ void Value::set_value(const char *v, size_t size)
     _dtype = 3;
 }
 
-int Value::to_int() const
+int32_t Value::to_i32() const
 {
     switch (_dtype) {
         case 1:
-            return static_cast<int>(_fval);
+            return static_cast<int32_t>(_fval);
         case 2:
-            return static_cast<int>(_ival);
+            return static_cast<int32_t>(_ival);
         case 3:
-            return util::strto<int>(c_str());
+            return util::strto<int32_t>(c_str());
+        default:
+            break;
+    }
+    return 0;
+}
+uint32_t Value::to_u32() const
+{
+    switch (_dtype) {
+        case 1:
+            return static_cast<uint32_t>(_fval);
+        case 2:
+            return static_cast<uint32_t>(_ival);
+        case 3:
+            return util::strto<uint32_t>(c_str());
         default:
             break;
     }
@@ -401,11 +417,11 @@ int Value::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 // int Value::deserialize(const std::string &in)
 //{
 //    uint16_t tag = 0;
-//    BytesBuffer buf(reinterpret_cast<uint8_t*>(const_cast<char*>(in.data())),
+//    BufferView buf(reinterpret_cast<uint8_t*>(const_cast<char*>(in.data())),
 //    in.size()); return deserialize(&buf,tag);
 //}
 
-int Value::deserialize(BytesBuffer *in, uint16_t &tag)
+int Value::deserialize(BufferView *in, uint16_t &tag)
 {
     uint8_t *data  = reinterpret_cast<uint8_t *>(in->data());
     uint8_t wtype  = TLV_LTYPE_ERROR;

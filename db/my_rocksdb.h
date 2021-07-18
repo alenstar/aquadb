@@ -15,30 +15,34 @@
 #pragma once
 
 #include "rocks_wrapper.h"
-#include <butil/time.h>
+
+#include <chrono>
+//#include <butil/time.h>
 
 namespace aquadb {
 
 class TimeCost {
 public:
     TimeCost() {
-        _start = butil::gettimeofday_us();
+        _start = std::chrono::steady_clock::now(); 
     }
 
     ~TimeCost() {}
 
     void reset() {
-        _start = butil::gettimeofday_us();
+        _start = std::chrono::steady_clock::now();
     }
 
     int64_t get_time() const {
-        return butil::gettimeofday_us() - _start;
+        auto t = std::chrono::steady_clock::now();
+        return std::chrono::duration_cast<std::chrono::duration<int64_t,std::chrono::microseconds>>( t - _start ).count()
     }
 
 private:
-    int64_t _start;
+    std::chrono::steady_clock::time_point _start;
 };
 
+/*
 struct RocksdbVars {
     static RocksdbVars* get_instance() {
         static RocksdbVars _instance;
@@ -71,6 +75,7 @@ private:
                    binlog_not_commit_max_cost_minute("binlog_not_commit_max_cost_minute", &binlog_not_commit_max_cost, 60) {
                    }
 };
+*/
 
 namespace myrocksdb {
 

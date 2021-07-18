@@ -128,11 +128,11 @@ int Array::deserialize(const std::string &in)
 {
     // TODO
     uint16_t tag = 0;
-    BytesBuffer buf(reinterpret_cast<uint8_t *>(const_cast<char *>(in.data())), in.size());
+    BufferView buf(reinterpret_cast<uint8_t *>(const_cast<char *>(in.data())), in.size());
     return deserialize(&buf, tag);
 }
 
-int Array::deserialize(BytesBuffer *in, uint16_t &tag)
+int Array::deserialize(BufferView *in, uint16_t &tag)
 {
     // TODO
     if (in->size() == 0)
@@ -299,7 +299,7 @@ int TupleRecord::deserialize(const std::string &in)
     }
     uint16_t tag = 0;
     uint8_t *data = reinterpret_cast<uint8_t *>(const_cast<char *>(in.data()));
-    BytesBuffer buf(data, in.size());
+    BufferView buf(data, in.size());
     return deserialize(&buf, tag);
 }
 
@@ -312,11 +312,22 @@ int TupleRecord::deserialize(const std::vector<uint8_t> &in)
     }
     uint16_t tag = 0;
     uint8_t *data = const_cast<uint8_t *>(in.data());
-    BytesBuffer buf(data, in.size());
+    BufferView buf(data, in.size());
     return deserialize(&buf, tag);
 }
 
-int TupleRecord::deserialize(BytesBuffer *in, uint16_t &tag)
+int TupleRecord::deserialize(BufferView& in)
+{
+    if (in.empty())
+    {
+        // 空对象不解码
+        return 0;
+    }
+    uint16_t tag = 0;
+    return deserialize(&in, tag);
+}
+
+int TupleRecord::deserialize(BufferView *in, uint16_t &tag)
 {
     if (in->size() == 0)
     {

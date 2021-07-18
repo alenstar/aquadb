@@ -22,7 +22,7 @@ TEST_CASE("testing the tlv_object") {
     obj.insert(4, d);
     obj.insert(5, e);
     obj.insert(6, std::move(f));
-    CHECK(a.to_int() == 1);
+    CHECK(a.to_i32() == 1);
     CHECK(f.is_none() == true);
     CHECK(obj.get(6)->to_string() == std::string("hello world!"));
     std::vector<uint8_t> out;

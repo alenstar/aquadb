@@ -25,7 +25,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
-#include "common.h"
+//#include "common.h"
 //#include "proto/store.interface.pb.h"
 
 namespace aquadb {
@@ -137,6 +137,31 @@ public:
         return _txn_db->IngestExternalFile(family, external_files, options);
     }
 
+
+std::unique_ptr<rocksdb::Iterator> seek_for_prev( rocksdb::ColumnFamilyHandle* family, const rocksdb::Slice &key, bool asprefix)
+{
+    rocksdb::ReadOptions roption(false, true);
+    roption.fill_cache = false;
+    roption.prefix_same_as_start = asprefix;
+    roption.verify_checksums = false;
+    auto cursor = std::unique_ptr<rocksdb::Iterator>(_txn_db->NewIterator(roption, family));
+    cursor->SeekForPrev(key);
+    return cursor;
+}
+
+
+std::unique_ptr<rocksdb::Iterator> seek_for_next( rocksdb::ColumnFamilyHandle* family, const rocksdb::Slice &key, bool asprefix)
+{
+    rocksdb::ReadOptions roption(false, true);
+    roption.fill_cache = false;
+    roption.prefix_same_as_start = asprefix;
+    roption.verify_checksums = false;
+    auto cursor = std::unique_ptr<rocksdb::Iterator>(_txn_db->NewIterator(roption, family));
+    cursor->Seek(key);
+    return cursor;
+}
+
+
     rocksdb::ColumnFamilyHandle* get_raft_log_handle();
 
     rocksdb::ColumnFamilyHandle* get_bin_log_handle();
@@ -210,8 +235,8 @@ private:
     rocksdb::ColumnFamilyOptions _data_cf_option;
     rocksdb::ColumnFamilyOptions _meta_info_option;
     uint64_t _flush_file_number = 0;
-    bvar::Adder<int64_t>     _raft_cf_remove_range_count;
-    bvar::Adder<int64_t>     _data_cf_remove_range_count;
-    bvar::Adder<int64_t>     _mata_cf_remove_range_count;
+    //bvar::Adder<int64_t>     _raft_cf_remove_range_count;
+    //bvar::Adder<int64_t>     _data_cf_remove_range_count;
+    //bvar::Adder<int64_t>     _mata_cf_remove_range_count;
 };
 }

@@ -147,7 +147,7 @@ rocksdb::Status Transaction::Get(const rocksdb::ReadOptions& options,
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
 
     return s;
 }
@@ -171,7 +171,7 @@ rocksdb::Status Transaction::GetForUpdate(const rocksdb::ReadOptions& options,
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
 
     return s;
 }
@@ -195,7 +195,7 @@ rocksdb::Status Transaction::GetForUpdate(const rocksdb::ReadOptions& options,
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
 
     return s;
 }
@@ -205,7 +205,7 @@ rocksdb::Status Transaction::Put(rocksdb::ColumnFamilyHandle* column_family, con
     TimeCost cost;
     auto s = _txn->Put(column_family, key, value);
 
-    RocksdbVars::get_instance()->rocksdb_put_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_put_time_cost << cost.get_time();
 
     return s;
 }
@@ -215,7 +215,7 @@ rocksdb::Status Transaction::Put(rocksdb::ColumnFamilyHandle* column_family, con
     TimeCost cost;
     auto s = _txn->Put(column_family, key, value);
 
-    RocksdbVars::get_instance()->rocksdb_put_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_put_time_cost << cost.get_time();
 
     return s;
 }

@@ -24,6 +24,8 @@ class MutTableKey {
 public:
     virtual ~MutTableKey() {}
     MutTableKey() : _full(false) {}
+    MutTableKey(MutTableKey&& k) : _full(k._full), _data(std::move(k._data)) {}
+    MutTableKey(const MutTableKey& k) : _full(k._full),_data(k._data) {}
 
     // create TableKey from a slice, use for extract fields
     MutTableKey(const Str& key, bool full = true) : 
