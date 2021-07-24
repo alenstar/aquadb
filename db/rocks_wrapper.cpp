@@ -12,17 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <gflags/gflags.h>
+
 #include "rocks_wrapper.h"
 #include "rocksdb/table.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/listener.h"
+
 #include <iostream>
-#include "common.h"
+//#include "common.h"
 #include "mut_table_key.h"
 #include "table_key.h"
-#include "my_listener.h"
-#include "raft_log_compaction_filter.h"
-#include "split_compaction_filter.h"
-#include "transaction_db_bthread_mutex.h"
+//#include "my_listener.h"
+#include "util/logdef.h"
+
+//#include "raft_log_compaction_filter.h"
+//#include "split_compaction_filter.h"
+//#include "transaction_db_bthread_mutex.h"
+
+#define DB_DEBUG(...) LOGD("[db]" __VA_ARGS__)
+#define DB_INFO(...) LOGI("[db]" __VA_ARGS__)
+#define DB_NOTICE(...) LOGI("[db]" __VA_ARGS__)
+#define DB_WARNING(...) LOGW("[db]" __VA_ARGS__)
+#define DB_FATAL(...) LOGE("[db]" __VA_ARGS__)
+
 namespace aquadb {
 
 DEFINE_int32(rocks_transaction_lock_timeout_ms, 20000, "rocksdb transaction_lock_timeout, real lock_time is 'time + rand_less(time)' (ms)");
@@ -55,6 +68,20 @@ DEFINE_int32(rocks_binlog_ttl_days, 7, "binlog ttl default 7 days");
 DEFINE_int32(level0_file_num_compaction_trigger, 5, "Number of files to trigger level-0 compaction");
 DEFINE_int32(max_bytes_for_level_base, 1024 * 1024 * 1024, "total size of level 1.");
 DEFINE_bool(enable_bottommost_compression, false, "enable zstd for bottommost_compression");
+
+
+class MyListener : public rocksdb::EventListener {
+    virtual void OnStallConditionsChanged(const rocksdb::WriteStallInfo& info) {
+        bool is_stall = info.condition.cur != rocksdb::WriteStallCondition::kNormal;
+        DB_WARNING("OnStallConditionsChanged, cf:%s is_stall:%d", info.cf_name.c_str(), is_stall);
+    }
+    virtual void OnFlushCompleted(rocksdb::DB* /*db*/, const rocksdb::FlushJobInfo& info) {
+        RocksWrapper::get_instance()->set_flush_file_number(info.cf_name, info.file_number);
+        DB_WARNING("OnFlushCompleted, cf:%s file_number:%lu", info.cf_name.c_str(), info.file_number);
+    }
+};
+
+
 
 const std::string RocksWrapper::RAFT_LOG_CF = "raft_log";
 const std::string RocksWrapper::BIN_LOG_CF  = "bin_log";
@@ -121,8 +148,8 @@ int32_t RocksWrapper::init(const std::string& path) {
     DB_NOTICE("FLAGS_rocks_transaction_lock_timeout_ms:%d FLAGS_rocks_default_lock_timeout_ms:%d", FLAGS_rocks_transaction_lock_timeout_ms, FLAGS_rocks_default_lock_timeout_ms);
     txn_db_options.transaction_lock_timeout = FLAGS_rocks_transaction_lock_timeout_ms;
     txn_db_options.default_lock_timeout = FLAGS_rocks_default_lock_timeout_ms;
-    txn_db_options.custom_mutex_factory = std::shared_ptr<rocksdb::TransactionDBMutexFactory>(
-                          new TransactionDBBthreadFactory());
+    //txn_db_options.custom_mutex_factory = std::shared_ptr<rocksdb::TransactionDBMutexFactory>(
+    //                      new TransactionDBBthreadFactory());
 
     //todo
     _log_cf_option.prefix_extractor.reset(
@@ -149,7 +176,8 @@ int32_t RocksWrapper::init(const std::string& path) {
     _binlog_cf_option.prefix_extractor.reset(
             rocksdb::NewFixedPrefixTransform(sizeof(int64_t)));
     _binlog_cf_option.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
-    _binlog_cf_option.compression = rocksdb::kLZ4Compression;
+    //_binlog_cf_option.compression = rocksdb::kLZ4Compression;
+    _binlog_cf_option.compression = rocksdb::kSnappyCompression;
     _binlog_cf_option.compression_opts.enabled = true;
     _binlog_cf_option.compaction_style = rocksdb::kCompactionStyleFIFO;
     rocksdb::CompactionOptionsFIFO fifo_option;
@@ -165,7 +193,7 @@ int32_t RocksWrapper::init(const std::string& path) {
             rocksdb::NewFixedPrefixTransform(sizeof(int64_t) * 2));
     _data_cf_option.OptimizeLevelStyleCompaction();
     _data_cf_option.compaction_pri = rocksdb::kByCompensatedSize;
-    _data_cf_option.compaction_filter = SplitCompactionFilter::get_instance();
+    // _data_cf_option.compaction_filter = SplitCompactionFilter::get_instance();
     _data_cf_option.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
     _data_cf_option.compaction_style = rocksdb::kCompactionStyleLevel;
 //    _data_cf_option.level0_file_num_compaction_trigger = 5;

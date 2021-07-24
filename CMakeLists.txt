@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1.12 FATAL_ERROR)
-project(AquaDB)
+project(AquaDB C CXX)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 message("CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}")
 
@@ -69,13 +69,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/output/bin)
 SET(THIRD_PARTY_PATH ${CMAKE_CURRENT_BINARY_DIR}/thirdparty)
 SET(THIRD_PARTY_BUILD_TYPE Release)
 SET(EXTERNAL_PROJECT_LOG_ARGS
-        LOG_DOWNLOAD 0
+        LOG_DOWNLOAD 1
         LOG_UPDATE 1
-        LOG_CONFIGURE 0
-        LOG_BUILD 0
-        LOG_TEST 1
-        LOG_INSTALL 0)
-
+        LOG_CONFIGURE 1
+        LOG_BUILD 1
+        LOG_TEST 0
+        LOG_INSTALL 1)
+#include(ExternalProject)
 include(ProcessorCount)
 ProcessorCount(NUM_OF_PROCESSOR)
 message(NUM_OF_PROCESSOR: ${NUM_OF_PROCESSOR})
@@ -105,6 +105,9 @@ else ()
     SET(ZLIB_LIBRARIES z)
 endif ()
 
+#lz4
+include(lz4)
+
 #gflags
 if (WITH_SYSTEM_LIBS)
     find_path(GFLAGS_INCLUDE_DIR NAMES gflags/gflags.h)
@@ -118,16 +121,16 @@ else ()
 endif ()
 
 #glog
-if (WITH_SYSTEM_LIBS)
-    find_path(GLOG_INCLUDE_DIR NAMES glog/logging.h)
-    find_library(GLOG_LIBRARIES NAMES glog)
-    if ((NOT GLOG_INCLUDE_DIR) OR (NOT GLOG_LIBRARIES))
-        message(FATAL_ERROR "Fail to find glog")
-    endif ()
-    ADD_LIBRARY(glog SHARED IMPORTED GLOBAL)
-else ()
-    include(glog)
-endif ()
+#if (WITH_SYSTEM_LIBS)
+#    find_path(GLOG_INCLUDE_DIR NAMES glog/logging.h)
+#    find_library(GLOG_LIBRARIES NAMES glog)
+#    if ((NOT GLOG_INCLUDE_DIR) OR (NOT GLOG_LIBRARIES))
+#        message(FATAL_ERROR "Fail to find glog")
+#    endif ()
+#    ADD_LIBRARY(glog SHARED IMPORTED GLOBAL)
+#else ()
+#    include(glog)
+#endif ()
 
 #snappy
 if (WITH_SYSTEM_LIBS)
@@ -157,53 +160,54 @@ endif ()
 
 #rocksdb
 if (WITH_SYSTEM_LIBS)
-    find_path(ROCKSDB_INCLUDE_DIR NAMES rocksdb/db.h)
-    find_library(ROCKSDB_LIBRARIES NAMES rocksdb)
+    find_path(ROCKSDB_INCLUDE_DIR NAMES rocksdb/db.h PATHS /usr/local/thirdparty/include)
+    find_library(ROCKSDB_LIBRARIES NAMES rocksdb PATHS /usr/local/thirdparty/lib)
     if ((NOT ROCKSDB_INCLUDE_DIR) OR (NOT ROCKSDB_LIBRARIES))
         message(FATAL_ERROR "Fail to find rocksdb")
     endif ()
     ADD_LIBRARY(rocksdb SHARED IMPORTED GLOBAL)
     INCLUDE_DIRECTORIES(${ROCKSDB_INCLUDE_DIR})
+    message(STATUS "Found rocksdb: ${ROCKSDB_LIBRARIES} ${ROCKSDB_INCLUDE_DIR}")
 else ()
     include(rocksdb)
 endif ()
 
 #brpc
-if (WITH_SYSTEM_LIBS)
-    #leveldb(for brpc)
-    find_library(LEVELDB_LIBRARIES NAMES leveldb)
-    if (NOT LEVELDB_LIBRARIES)
-        message(FATAL_ERROR "Fail to find leveldb")
-    endif ()
-
-    find_path(BRPC_INCLUDE_DIR NAMES brpc/server.h PATHS /opt/brpc/include)
-    find_library(BRPC_LIBRARIES NAMES libbrpc.a brpc PATHS /opt/brpc/lib)
-    if ((NOT BRPC_INCLUDE_DIR) OR (NOT BRPC_LIBRARIES))
-        message(FATAL_ERROR "Fail to find brpc")
-    endif ()
-    ADD_LIBRARY(brpc STATIC IMPORTED GLOBAL)
-    SET_PROPERTY(TARGET brpc PROPERTY IMPORTED_LOCATION ${BRPC_LIBRARIES})
-    INCLUDE_DIRECTORIES(${BRPC_INCLUDE_DIR})
-else ()
-    include(leveldb)
-    include(brpc)
-endif ()
-message(BRPC:${BRPC_INCLUDE_DIR}, ${BRPC_LIBRARIES})
+#if (WITH_SYSTEM_LIBS)
+#    #leveldb(for brpc)
+#    find_library(LEVELDB_LIBRARIES NAMES leveldb)
+#    if (NOT LEVELDB_LIBRARIES)
+#        message(FATAL_ERROR "Fail to find leveldb")
+#    endif ()
+#
+#    find_path(BRPC_INCLUDE_DIR NAMES brpc/server.h PATHS /opt/brpc/include)
+#    find_library(BRPC_LIBRARIES NAMES libbrpc.a brpc PATHS /opt/brpc/lib)
+#    if ((NOT BRPC_INCLUDE_DIR) OR (NOT BRPC_LIBRARIES))
+#        message(FATAL_ERROR "Fail to find brpc")
+#    endif ()
+#    ADD_LIBRARY(brpc STATIC IMPORTED GLOBAL)
+#    SET_PROPERTY(TARGET brpc PROPERTY IMPORTED_LOCATION ${BRPC_LIBRARIES})
+#    INCLUDE_DIRECTORIES(${BRPC_INCLUDE_DIR})
+#else ()
+#    include(leveldb)
+#    include(brpc)
+#endif ()
+#message(BRPC:${BRPC_INCLUDE_DIR}, ${BRPC_LIBRARIES})
 
 #braft
-if (WITH_SYSTEM_LIBS)
-    find_path(BRAFT_INCLUDE_DIR NAMES braft/raft.h PATHS /opt/braft/include)
-    find_library(BRAFT_LIBRARIES NAMES libbraft.a brpc PATHS /opt/braft/lib)
-    if ((NOT BRAFT_INCLUDE_DIR) OR (NOT BRAFT_LIBRARIES))
-        message(FATAL_ERROR "Fail to find braft")
-    endif ()
-    ADD_LIBRARY(braft STATIC IMPORTED GLOBAL)
-    SET_PROPERTY(TARGET braft PROPERTY IMPORTED_LOCATION ${BRAFT_LIBRARIES})
-    INCLUDE_DIRECTORIES(${BRAFT_INCLUDE_DIR})
-else ()
-#include(braft)
-endif ()
-message(braft lib : ${BRAFT_LIBRARIES})
+#if (WITH_SYSTEM_LIBS)
+#    find_path(BRAFT_INCLUDE_DIR NAMES braft/raft.h PATHS /opt/braft/include)
+#    find_library(BRAFT_LIBRARIES NAMES libbraft.a brpc PATHS /opt/braft/lib)
+#    if ((NOT BRAFT_INCLUDE_DIR) OR (NOT BRAFT_LIBRARIES))
+#        message(FATAL_ERROR "Fail to find braft")
+#    endif ()
+#    ADD_LIBRARY(braft STATIC IMPORTED GLOBAL)
+#    SET_PROPERTY(TARGET braft PROPERTY IMPORTED_LOCATION ${BRAFT_LIBRARIES})
+#    INCLUDE_DIRECTORIES(${BRAFT_INCLUDE_DIR})
+#else ()
+##include(braft)
+#endif ()
+#message(braft lib : ${BRAFT_LIBRARIES})
 
 
 

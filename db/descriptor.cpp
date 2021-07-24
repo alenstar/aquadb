@@ -4,60 +4,65 @@
 namespace aquadb
 {
 
-inline int append_value(const FieldDescriptor *field, const Value *v, MutTableKey &key)
-{
-    auto type = static_cast<MysqlType>(field->ptype());
+
+
+inline int field_fixed_size(const FieldDescriptor *field) {
+    auto type = field->type; 
     switch (type) {
-        case MysqlType::MYSQL_TYPE_TINY:
-            key.append_i8(static_cast<int8_t>(v->to_i32()));
-            break;
-        case MysqlType::MYSQL_TYPE_SHORT:
-            key.append_i16(static_cast<int16_t>(v->to_long()));
-            break;
-        case MysqlType::MYSQL_TYPE_INT24:
-            key.append_i32(static_cast<int32_t>(v->to_long()));
-            break;
-        case MysqlType::MYSQL_TYPE_LONG:
-            key.append_i64(static_cast<int64_t>(v->to_long()));
-            break;
-        // case MysqlType::MYSQL_TYPE_LONGLONG:
-        //    break;
-        case MysqlType::MYSQL_TYPE_FLOAT:
-            key.append_float(static_cast<float>(v->to_double()));
-            break;
-        case MysqlType::MYSQL_TYPE_DOUBLE:
-            key.append_double(v->to_double());
-            break;
-
-        case MysqlType::MYSQL_TYPE_VARCHAR:
-            // fixed char
-            key.append_fixed_char(v->c_str(), v->size(), field->size());
-            break;
-
-        case MysqlType::MYSQL_TYPE_BLOB:
-        case MysqlType::MYSQL_TYPE_VAR_STRING:
-        case MysqlType::MYSQL_TYPE_STRING:
-            // not support
-            break;
-
+        case FieldDescriptor::FieldType::Int8:
+        return 1;
+        case FieldDescriptor::FieldType::Int16:
+        return 2;
+        case FieldDescriptor::FieldType::Int32:
+        return 4;
+        case FieldDescriptor::FieldType::Int64:
+        return 8;
+        case FieldDescriptor::FieldType::Float32:
+        return 4;
+        case FieldDescriptor::FieldType::Float64:
+        return 8;
+        case FieldDescriptor::FieldType::FixedString:
+            return field->size();
+        case FieldDescriptor::FieldType::String:
+        // 变长数据返回0
+        return 0;
         default:
-            break;
+        // 不支持的类型
+        return -1;
     }
-    return 0;
 }
+
+    int IndexDescriptor::key_size(const TableDescriptor* p) const {
+        int ksz = 0;
+        for (auto f: fields)
+        {
+            auto it = p->fields.find(f);
+            if(it == p->fields.cend()) {
+                return -1;
+            }
+            //auto type = it->second.type;
+            ksz += field_fixed_size(&(it->second));
+        }
+        return ksz;
+    }
+
+
 // 获取索引key
 int TableDescriptor::get_index_key(const std::vector<uint16_t> &fields, TupleRecord &obj, MutTableKey &key)
 {
     std::vector<const FieldDescriptor *> infos;
     int rc = get_index_key_info(fields, infos);
+    if(rc != 0)
+    {
+        return rc;
+    }
     for (auto i : infos) {
         auto v = obj.get(i->id);
         if (!v) {
             return -1;
         }
-        append_value(i, v, key);
+        field_append_value(i, v, key);
     }
-
     return 0;
 }
 // 获取主键key
@@ -66,12 +71,16 @@ int TableDescriptor::get_primary_key(TupleRecord &obj,MutTableKey &key)
 
     std::vector<const FieldDescriptor *> infos;
     int rc = get_primary_key_info(infos);
+        if(rc != 0)
+    {
+        return rc;
+    }
     for (auto i : infos) {
         auto v = obj.get(i->id);
         if (!v) {
             return -1;
         }
-        append_value(i, v, key);
+        field_append_value(i, v, key);
     }
     return 0;
 }

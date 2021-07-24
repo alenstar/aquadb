@@ -19,7 +19,7 @@ namespace aquadb{
 
 TableKey::TableKey(const MutTableKey& key) : 
         _full(key.get_full()),
-        _data(key.data().data()) {}
+        _data(key.data()) {}
 
 
 

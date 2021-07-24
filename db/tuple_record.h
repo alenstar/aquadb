@@ -70,7 +70,7 @@ class TupleRecord
 
     bool has(int tag) const;
     size_t size() const;
-
+    void clear() ;
   private:
     TupleRecord &operator=(const TupleRecord &c);
 
@@ -150,6 +150,8 @@ inline bool TupleRecord::has(int tag) const
 }
 
 inline size_t TupleRecord::size() const { return _values.size(); }
+inline void TupleRecord::clear() { return _values.clear(); }
+
 
 ///////////////////////////////////////
 // array<object>

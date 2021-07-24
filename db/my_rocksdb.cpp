@@ -36,7 +36,7 @@ void Iterator::Seek(const rocksdb::Slice& target) {
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_seek_time_cost << cost.get_time();
+    //RocksdbVars::get_instance()->rocksdb_seek_time_cost << cost.get_time();
 
 }
 
@@ -57,7 +57,7 @@ void Iterator::SeekForPrev(const rocksdb::Slice& target) {
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_seek_time_cost << cost.get_time();
+    //RocksdbVars::get_instance()->rocksdb_seek_time_cost << cost.get_time();
 }
 
 void Iterator::Next() {
@@ -77,7 +77,7 @@ void Iterator::Next() {
     //    local->scan_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_scan_time_cost << cost.get_time();
+    //RocksdbVars::get_instance()->rocksdb_scan_time_cost << cost.get_time();
 
     return;
 }
@@ -99,7 +99,7 @@ void Iterator::Prev() {
     //    local->scan_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_scan_time_cost << cost.get_time();
+    //RocksdbVars::get_instance()->rocksdb_scan_time_cost << cost.get_time();
 
     return;
 }
@@ -123,7 +123,7 @@ rocksdb::Status Transaction::Get(const rocksdb::ReadOptions& options,
     //    local->get_statistics_adder();
     //}
 
-    RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
+    // RocksdbVars::get_instance()->rocksdb_get_time_cost << cost.get_time();
 
     return s;
 }

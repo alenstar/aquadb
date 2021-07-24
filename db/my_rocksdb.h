@@ -35,7 +35,7 @@ public:
 
     int64_t get_time() const {
         auto t = std::chrono::steady_clock::now();
-        return std::chrono::duration_cast<std::chrono::duration<int64_t,std::chrono::microseconds>>( t - _start ).count()
+        return std::chrono::duration_cast<std::chrono::microseconds>( t - _start ).count();
     }
 
 private:

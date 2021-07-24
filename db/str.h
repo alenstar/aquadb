@@ -166,9 +166,9 @@ public:
     //inline bool         empty() const                           { return Data[0] == 0; }
     inline bool         empty() const                           { return Length == 0; }
     //inline int          length() const                          { return (int)strlen(Data); }    // by design, allow user to write into the buffer at any time
-    inline int          length() const                          { return Length; }    // by design, allow user to write into the buffer at any time
-    inline int          size() const                            { return Length; }    // by design, allow user to write into the buffer at any time
-    inline int          capacity() const                        { return Capacity; }
+    inline size_t          length() const                          { return Length; }    // by design, allow user to write into the buffer at any time
+    inline size_t          size() const                            { return Length; }    // by design, allow user to write into the buffer at any time
+    inline size_t          capacity() const                        { return Capacity; }
 
     inline void         set_ref(const char* src);
     inline void         set_ref(const char* src, int size);
@@ -550,17 +550,17 @@ template <int N> class TinyStr
 };
 
 
-class TinyStrRef
+class StrView
 {
   public:
-    TinyStrRef() { _buffer = nullptr; }
-    TinyStrRef(const TinyStrRef &s) { set_ref(s.data(), s.size()); }
-    TinyStrRef(const std::string &s) { set_ref(s.data(), s.size()); }
-    TinyStrRef(const char *s) { set_ref(s); }
-    TinyStrRef(const char *s, int size) { set_ref(s, size); }
-    ~TinyStrRef() {}
+    StrView() { _buffer = nullptr; }
+    StrView(const StrView &s) { set_ref(s.data(), s.size()); }
+    StrView(const std::string &s) { set_ref(s.data(), s.size()); }
+    StrView(const char *s) { set_ref(s); }
+    StrView(const char *s, int size) { set_ref(s, size); }
+    ~StrView() {}
 
-    inline TinyStrRef &operator=(const char *rhs)
+    inline StrView &operator=(const char *rhs)
     {
         if(rhs == nullptr)
         {
@@ -573,18 +573,18 @@ class TinyStrRef
     }
     inline bool operator==(const char *rhs) const { return strcmp(c_str(), rhs) == 0; }
 
-    inline TinyStrRef &operator=(const TinyStrRef &rhs)
+    inline StrView &operator=(const StrView &rhs)
     {
         set_ref(rhs.c_str(), rhs.size());
         return *this;
     }
-    inline bool operator==(const TinyStrRef &rhs) const { return ::strcmp(c_str(), rhs.c_str()) == 0; }
-    inline int compare(const TinyStrRef &rhs) const
+    inline bool operator==(const StrView &rhs) const { return ::strcmp(c_str(), rhs.c_str()) == 0; }
+    inline int compare(const StrView &rhs) const
     {
         return ::strncmp(c_str(), rhs.c_str(), length() > rhs.length() ? length() : rhs.length());
     }
 
-    inline TinyStrRef &operator=(const std::string &rhs)
+    inline StrView &operator=(const std::string &rhs)
     {
         set_ref(rhs.c_str(), rhs.size());
         return *this;
@@ -600,8 +600,8 @@ class TinyStrRef
     const char *find_last_of(char c) const { return ::strrchr(_buffer, c); }
     const char *data() const { return _buffer; }
     const char *c_str() const { return _buffer; }
-    int size() const { return _size; }
-    int length() const { return _size; }
+    size_t size() const { return _size; }
+    size_t length() const { return _size; }
     void clear() { _buffer = nullptr; }
 
     void set_ref(const char *s)

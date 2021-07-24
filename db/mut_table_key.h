@@ -26,6 +26,15 @@ public:
     MutTableKey() : _full(false) {}
     MutTableKey(MutTableKey&& k) : _full(k._full), _data(std::move(k._data)) {}
     MutTableKey(const MutTableKey& k) : _full(k._full),_data(k._data) {}
+    MutTableKey &operator=(MutTableKey &&cv) noexcept
+    {
+        if (this == &cv)
+        {
+            return *this;
+        }
+        _full = cv._full;
+        _data = std::move(cv._data);
+    }
 
     // create TableKey from a slice, use for extract fields
     MutTableKey(const Str& key, bool full = true) : 
@@ -148,7 +157,7 @@ public:
     MutTableKey& append_index(const TableKey& key);
 
     MutTableKey& append_index(const MutTableKey& key) {
-        _data.append(key.data().data(), key.size());
+        _data.append(key.data(), key.size());
         return *this;
     }
     
@@ -158,25 +167,27 @@ public:
     }
 
 
-    void set_full(bool full) {
+    inline void set_full(bool full) {
         _full = full;
     }
 
-    bool get_full() const{
+    inline bool get_full() const{
         return _full;
     }
 
-    size_t size() const {
+    inline size_t size() const {
         return _data.length();
     }
 
-    const Str& data() const {
-        return _data;
+    inline const char* data() const {
+        return _data.data();
     }
 
-    Str& data() {
-        return _data;
+    inline char* data() {
+        return _data.data();
     }
+
+    inline const char* c_str() const { return _data.c_str();}
 
 private:
     bool           _full;  //full key or just a prefix

@@ -12,6 +12,10 @@ namespace aquadb
 const uint32_t kMetaDatabaseId = 1001;
 const uint32_t kMetaTableId = 1002;
 
+
+class TableDescriptor;
+
+
 // 数据格式
 //  key [表ID + 分区ID + 主键]
 // data [TLV数据 + 时间戳]
@@ -70,6 +74,8 @@ class IndexDescriptor
 
     inline bool is_primary_key() const { return 0x01 == type;}
 
+    int key_size(const TableDescriptor* p) const;
+
     int serialize(std::vector<uint8_t> &out)
     {
         TupleRecord obj;
@@ -109,31 +115,53 @@ class IndexDescriptor
 class FieldDescriptor
 {
   public:
+    enum class FieldFlag:uint16_t {
+        None = 0,
+        PrimaryKey = 0x01,
+        NullAble = 0x02
+    };    
+    enum class FieldType:uint16_t {
+        None = 0,
+        Float64 = 1,
+        Float32 = 2,
+        Int64 = 3,
+        Int32 = 4,
+        Int16 = 5,
+        Int8 = 6,
+        FixedString = 7,
+        String = 8,
+        DateTime = 9
+    };
+
     std::string name;    // 1 字段名
     uint16_t id    = 0;  // 2 字段id
-    uint16_t type  = 0;  // 3 数据类型
-    uint32_t flags = 0;  // 4 扩展标记，0x01 主键 primary key, 0x02 允许 null, 0x04 unsigned
+    FieldType type  = FieldType::None;  // 3 数据类型
+    uint16_t flags = 0;  // 4 扩展标记，0x01 主键 primary key, 0x02 允许 null, 0x04 unsigned
+    union 
+    {
     uint32_t len   = 0;  // 5 数据长度
+    uint32_t precision; // 5 精度
+    };
     std::string comment; // 6 注释
     std::string extra;   // 7 扩展字段, json or msgpack or cbor
 
     uint32_t size() const { return len; }
     // 数据类型, long double string
-    uint8_t dtype() const { return 0x0ff & type; }
-    void set_dtype(uint8_t t) { type = (type & 0xff00) | t; }
+    // uint8_t dtype() const { return 0x0ff & type; }
+    //void set_dtype(uint8_t t) { type = (type & 0xff00) | t; }
     // 展示类型 int8,int16,int32, int64,double,float,text, bytes, blob,
     // date,datetime, JSON, CBOR
-    uint8_t ptype() const { return (0xff00 & type) >> 8; }
-    void set_ptype(uint8_t t) { type = (type & 0x00ff) | (t << 8); }
+    FieldType field_type() const { return type; }
+    //void set_ptype(uint8_t t) { type = (type & 0x00ff) | (t << 8); }
 
-    void set_type(uint16_t dtp, uint16_t ptp) { type = dtp | (ptp << 8); }
+    //void set_type(uint16_t dtp, uint16_t ptp) { type = dtp | (ptp << 8); }
     bool is_unsigned() const { return flags & 0x04; }
     int serialize(TupleRecord &out) const
     {
         out.insert(1, Value(name));
         out.insert(2, Value(id));
-        out.insert(3, Value(type));
-        out.insert(4, Value(flags));
+        out.insert(3, Value(static_cast<int>(type)));
+        out.insert(4, Value(static_cast<int>(flags)));
         out.insert(5, Value(len));
         out.insert(6, Value(comment));
         out.insert(7, Value(extra));
@@ -145,9 +173,9 @@ class FieldDescriptor
 
         if (in.has(2)) id = in.get(2)->to_i32();
 
-        if (in.has(3)) type = in.get(3)->to_i32();
+        if (in.has(3)) type = static_cast<FieldType>(in.get(3)->to_i32());
 
-        if (in.has(4)) flags = in.get(4)->to_i32();
+        if (in.has(4)) flags = static_cast<uint16_t>(in.get(4)->to_i32());
 
         if (in.has(5)) len = in.get(5)->to_i32();
 
@@ -178,6 +206,24 @@ class TableDescriptor
      * 2 {name: createtime, id: 0, dtype:int64}
      * 3 {name: modifytime, id: 0, dtype:int64}
      */
+    uint16_t last_field_id = 0; // 7 最新字段id
+
+    int set_primary_key(std::vector<uint16_t> ids)
+    {
+        auto pk = new IndexDescriptor;
+        pk->fields = ids;
+        pk->type = 1; // 主键索引
+        if(_primarykey)
+        {
+            delete _primarykey;
+        }
+        _primarykey = pk;
+        return 0;
+    }
+    IndexDescriptor* get_primary_key()
+    {
+        return _primarykey;
+    }
 
     int get_primary_key_info(std::vector<const FieldDescriptor *> infos)
     {
@@ -203,7 +249,7 @@ class TableDescriptor
     // 获取主键key
     int get_primary_key(TupleRecord &obj, MutTableKey &key);
 
-    int serialize(std::vector<uint8_t> &out)
+    int serialize(std::vector<uint8_t> &out) const
     {
         TupleRecord obj;
         obj.insert(1, Value(id));
@@ -219,6 +265,7 @@ class TableDescriptor
             field.second.serialize(item);
             subobj.insert(field.first, std::move(item));
         }
+        obj.insert(7, Value(last_field_id));
         return obj.serialize(out);
     }
     int deserialize(const std::vector<uint8_t> &in)
@@ -245,8 +292,13 @@ class TableDescriptor
         if (obj.has(5)) {
             auto v = obj.get(5);
             // 采用小端
-            const uint16_t* p = reinterpret_cast<const uint16_t*>(v->data());
+            //const uint16_t* p = reinterpret_cast<const uint16_t*>(v->data());
             size_t sz = v->size() / sizeof(uint16_t);
+            if (_primarykey)
+            {
+                delete _primarykey;
+            }
+            _primarykey = new IndexDescriptor;
             for (size_t i = 0; i < sz; ++i) {
                 _primarykey->fields.push_back((uint16_t)(v->data()[i]));
             }
@@ -265,7 +317,21 @@ class TableDescriptor
             fields.emplace(fid, std::move(field));
         }
 
+        if (obj.has(7)) last_field_id = static_cast<uint32_t>(obj.get(1)->to_i32());
         return rc;
+    }
+
+    MutTableKey get_key(uint32_t metaId, uint32_t dbid) const {
+        MutTableKey k;
+        k.append_u32(metaId); 
+        k.append_u32(dbid); 
+        k.append_u32(id); 
+        return k;
+    }
+    BufferArray get_val() const {
+        BufferArray ba;
+        serialize(ba());
+        return ba;
     }
 
     const IndexDescriptor* get_index_descriptor(const std::string& name) const
@@ -303,12 +369,19 @@ class TableDescriptor
         }
         return &(it->second);
     } 
+
+    void add_field(int id, FieldDescriptor p)
+    {
+        fields[id] = p;
+    }
+    uint16_t next_id() { return ++last_field_id;}
     private:
     std::string _dbname; // 库名
     int status = 0; // 表状态, 加锁时使用
     std::vector<IndexDescriptor*> _indexs; // 索引
     IndexDescriptor* _primarykey {nullptr}; // 索引
 };
+typedef std::shared_ptr<TableDescriptor> TableDescriptorPtr;
 
 // 表信息格式
 //  key [metaId + 库ID]
@@ -423,8 +496,114 @@ class DatabaseDescriptor
         }
         return &(it->second);
     } 
+
+    bool exists(const std::string& name) const {
+        auto it = _name2table.find(name);
+        if(it != _name2table.cend())
+        {
+            return true;
+        }
+        return false;
+    }
+    TableDescriptorPtr get_table(const std::string& name) {
+        auto it = _name2table.find(name);
+        if(it != _name2table.cend())
+        {
+            return it->second;
+        }
+        return nullptr;
+    }
+    void add_table(const std::string& name, TableDescriptorPtr p) {
+        _name2table[name] = p;
+    }
+
+    uint32_t next_id() { return (++last_tid);}
     private:
+    std::map<std::string, TableDescriptorPtr> _name2table;
 };
+typedef std::shared_ptr<DatabaseDescriptor> DatabaseDescriptorPtr;
 
     
+    
+inline int field_append_value(const FieldDescriptor *field, const Value *v, MutTableKey &key)
+{
+    auto type = field->type; // static_cast<MysqlType>(field->ptype());
+    switch (type) {
+        case FieldDescriptor::FieldType::Int8:
+            key.append_i8(static_cast<int8_t>(v->to_i32()));
+            break;
+        case FieldDescriptor::FieldType::Int16:
+            key.append_i16(static_cast<int16_t>(v->to_long()));
+            break;
+        case FieldDescriptor::FieldType::Int32:
+            key.append_i32(static_cast<int32_t>(v->to_long()));
+            break;
+        case FieldDescriptor::FieldType::Int64:
+            key.append_i64(static_cast<int64_t>(v->to_long()));
+            break;
+        case FieldDescriptor::FieldType::Float32:
+            key.append_float(static_cast<float>(v->to_double()));
+            break;
+        case FieldDescriptor::FieldType::Float64:
+            key.append_double(v->to_double());
+            break;
+
+        case FieldDescriptor::FieldType::FixedString:
+            // fixed char
+            key.append_fixed_char(v->c_str(), v->size(), field->size());
+            break;
+
+        case FieldDescriptor::FieldType::String:
+            // not support
+            break;
+
+        default:
+            break;
+    }
+    return 0;
+}
+
+
+
+inline int field_default_value(const FieldDescriptor *field, Value *v)
+{
+    auto type = field->type; // static_cast<MysqlType>(field->ptype());
+    switch (type) {
+        case FieldDescriptor::FieldType::Int8:
+            v->set_value(0);
+            break;
+        case FieldDescriptor::FieldType::Int16:
+            v->set_value(0);
+            break;
+        case FieldDescriptor::FieldType::Int32:
+            v->set_value(0);
+            break;
+        case FieldDescriptor::FieldType::Int64:
+            v->set_value(0);
+            break;
+        case FieldDescriptor::FieldType::Float32:
+            v->set_value(0.0);
+            break;
+        case FieldDescriptor::FieldType::Float64:
+            v->set_value(0.0);
+            break;
+
+        case FieldDescriptor::FieldType::FixedString:
+            // fixed char
+            v->set_value("");
+            break;
+
+        case FieldDescriptor::FieldType::String:
+            // not support
+            v->set_value("");
+            break;
+
+        default:
+            break;
+    }
+    return 0;
+}
+
+
+
 }
