@@ -209,7 +209,8 @@ endif ()
 #endif ()
 #message(braft lib : ${BRAFT_LIBRARIES})
 
-
+#NuRaft
+include(nuraft)
 
 
 
@@ -219,6 +220,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}
 ${PROJECT_BINARY_DIR}
 ${PROJECT_SOURCE_DIR}/thirdparty
 ${PROJECT_SOURCE_DIR}/thirdparty/doctest
+${PROJECT_SOURCE_DIR}/NuRaft/include
 ${PROJECT_SOURCE_DIR}/db)
 
 
@@ -233,11 +235,16 @@ else()
 set(SYS_LIBS z rt dl pthread)
 endif()
 
-#add_subdirectory(thirdparty/lmdb)
+add_definitions(-DCPPHTTPLIB_ZLIB_SUPPORT)
+#add_subdirectory(thirdparty/httplib)
+
+#set(DISABLE_SSL 1)
+#add_subdirectory(NuRaft)
 add_subdirectory(db)
 add_subdirectory(util)
 add_subdirectory(cerebro)
 add_subdirectory(tests)
+add_subdirectory(kvstore)
 
 
 # used by doc home and in packaging

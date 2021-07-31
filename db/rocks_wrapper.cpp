@@ -24,17 +24,28 @@
 #include "mut_table_key.h"
 #include "table_key.h"
 //#include "my_listener.h"
+
+
+#define SPDLOG_TAG "DB"
 #include "util/logdef.h"
 
 //#include "raft_log_compaction_filter.h"
 //#include "split_compaction_filter.h"
 //#include "transaction_db_bthread_mutex.h"
 
-#define DB_DEBUG(...) LOGD("[db]" __VA_ARGS__)
-#define DB_INFO(...) LOGI("[db]" __VA_ARGS__)
-#define DB_NOTICE(...) LOGI("[db]" __VA_ARGS__)
-#define DB_WARNING(...) LOGW("[db]" __VA_ARGS__)
-#define DB_FATAL(...) LOGE("[db]" __VA_ARGS__)
+
+//#define DB_DEBUG(...) LOGD("[db]" __VA_ARGS__)
+//#define DB_INFO(...) LOGI("[db]" __VA_ARGS__)
+//#define DB_NOTICE(...) LOGI("[db]" __VA_ARGS__)
+//#define DB_WARNING(...) LOGW("[db]" __VA_ARGS__)
+//#define DB_FATAL(...) LOGE("[db]" __VA_ARGS__)
+
+#define DB_DEBUG(...) LOGD( __VA_ARGS__)
+#define DB_INFO(...) LOGI( __VA_ARGS__)
+#define DB_NOTICE(...) LOGI( __VA_ARGS__)
+#define DB_WARNING(...) LOGW( __VA_ARGS__)
+#define DB_FATAL(...) LOGE( __VA_ARGS__)
+
 
 namespace aquadb {
 
@@ -42,7 +53,7 @@ DEFINE_int32(rocks_transaction_lock_timeout_ms, 20000, "rocksdb transaction_lock
 DEFINE_int32(rocks_default_lock_timeout_ms, 30000, "rocksdb default_lock_timeout(ms)");
 
 DEFINE_bool(rocks_use_partitioned_index_filters, false, "rocksdb use Partitioned Index Filters");
-DEFINE_bool(rocks_skip_stats_update_on_db_open, false, "rocks_skip_stats_update_on_db_open");
+DEFINE_bool(rocks_skip_stats_update_on_db_open, true, "rocks_skip_stats_update_on_db_open");
 DEFINE_int32(rocks_block_size, 64 * 1024, "rocksdb block_cache size, default: 64KB");
 DEFINE_int64(rocks_block_cache_size_mb, 8 * 1024, "rocksdb block_cache_size_mb, default: 8G");
 DEFINE_uint64(rocks_hard_pending_compaction_g, 256, "rocksdb hard_pending_compaction_bytes_limit , default: 256G");
@@ -445,3 +456,5 @@ rocksdb::ColumnFamilyHandle* RocksWrapper::get_meta_info_handle() {
 }
 
 }
+
+#undef SPDLOG_TAG

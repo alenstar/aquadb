@@ -93,7 +93,7 @@ set(_HTTPLIB_OPENSSL_MIN_VER "1.1.1")
 
 # Allow for a build to require OpenSSL to pass, instead of just being optional
 option(HTTPLIB_REQUIRE_OPENSSL "Requires OpenSSL to be found & linked, or fails build." OFF)
-option(HTTPLIB_REQUIRE_ZLIB "Requires ZLIB to be found & linked, or fails build." OFF)
+option(HTTPLIB_REQUIRE_ZLIB "Requires ZLIB to be found & linked, or fails build." ON)
 # Allow for a build to casually enable OpenSSL/ZLIB support, but silenty continue if not found.
 # Make these options so their automatic use can be specifically disabled (as needed)
 option(HTTPLIB_USE_OPENSSL_IF_AVAILABLE "Uses OpenSSL (if available) to enable HTTPS support." ON)

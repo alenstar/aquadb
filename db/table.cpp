@@ -404,4 +404,51 @@ int TableReader::prev()
     }
     return 0;
 }
+
+
+int TableReader::get(const std::vector<Value>& pk, std::vector<Value>& row)
+{
+    return -1;
+}
+
+int TableReader::get(const Value& key, Value& val)
+{
+    auto pk = _tbl->get_primary_key();
+    int rc = seek_to(pk, {key});
+    if(rc != 0)
+    {
+        return rc;
+    }
+
+    if (!_iter->Valid())
+    {
+        // error
+        _errmsg = "Data iterator invalid";
+        return ERR_INVALID_PARAMS;
+    }
+
+        auto v = _iter->value();
+        BufferView buf(v.data(), v.size());
+        TupleRecord trecord;
+        trecord.deserialize(buf);
+
+        for (auto it : _tbl->fields)
+        {
+            if(it.second.flags & static_cast<uint16_t>(FieldDescriptor::FieldFlag::PrimaryKey))
+            {
+                continue;
+            }
+            if (trecord.has(it.first))
+            {
+                //  one field
+                val = trecord.at(it.first);
+                return 0;
+            }
+        }
+
+    return -1;
+}
+
+
+
 }

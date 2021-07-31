@@ -34,6 +34,7 @@ public:
         }
         _full = cv._full;
         _data = std::move(cv._data);
+        return *this;
     }
 
     // create TableKey from a slice, use for extract fields

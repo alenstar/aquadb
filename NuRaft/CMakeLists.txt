@@ -265,11 +265,11 @@ endif ()
 message(STATUS "Output library file name: ${LIBRARY_OUTPUT_NAME}")
 
 # === Examples ===
-add_subdirectory("${PROJECT_SOURCE_DIR}/examples")
+#add_subdirectory("${PROJECT_SOURCE_DIR}/examples")
 
 
 # === Tests ===
-add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
+#add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
 
 
 if (CODE_COVERAGE GREATER 0)

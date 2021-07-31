@@ -350,7 +350,7 @@ int TupleRecord::deserialize(BufferView *in, uint16_t &tag)
         wtype = data[0] & 0x000f;
         pos += 1;
     }
-    LOGD("tag=%d, wtype=%d, pos=%lu", tag, wtype, pos);
+    //LOGD("tag=%d, wtype=%d, pos=%lu", tag, wtype, pos);
     in->peek(pos);
     // TODO
     // std::string buf = in.substr(pos);

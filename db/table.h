@@ -64,6 +64,9 @@ class TableReader
     int next();
     int prev();
 
+    int get(const std::vector<Value>& pk, std::vector<Value>& row);
+    int get(const Value& key, Value& val);
+
     inline const std::vector<std::string>& get_columns() const { return _names;}
     inline const std::vector<Value>& get_current_row() const { return _values;}
     inline const std::string& get_errmsg() const { return _errmsg;}

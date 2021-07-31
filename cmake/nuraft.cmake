@@ -1,0 +1,83 @@
+INCLUDE(ExternalProject)
+#find_package(Threads)
+set(CMAKE_HAVE_LIBC_PTHREAD 1
+
+#option(ENABLE_NURAFT "Enable NuRaft" ${ENABLE_LIBRARIES})
+option(ENABLE_NURAFT "Enable NuRaft" ON)
+
+if (NOT ENABLE_NURAFT)
+    return()
+endif()
+
+#if (NOT EXISTS "${PROJECT_SOURCE_DIR}/NuRaft/CMakeLists.txt")
+#    message (WARNING "submodule thirdparty/NuRaft is missing. to fix try run: \n git submodule update --init --recursive")
+#    # message (${RECONFIGURE_MESSAGE_LEVEL} "Can't find internal NuRaft library")
+#    set (USE_NURAFT 0)
+#    return()
+#endif ()
+
+
+)
+
+SET(NURAFT_SOURCES_DIR ${THIRD_PARTY_PATH}/nuraft)
+SET(NURAFT_INSTALL_DIR ${THIRD_PARTY_PATH}/install/)
+SET(NURAFT_INCLUDE_DIR "${NURAFT_INSTALL_DIR}/include" CACHE PATH "nuraft include directory." FORCE)
+SET(NURAFT_LIBRARIES "${NURAFT_INSTALL_DIR}/lib/libnuraft.a" CACHE FILEPATH "nuraft library." FORCE)
+set(NURAFT_BINARY_DIR ${NURAFT_INSTALL_DIR}/bin)
+
+find_program(MAKE_EXECUTABLE
+NAMES gmake mingw32-make make
+NAMES_PER_DIR
+DOC "GNU Make")
+
+find_program(CMAKE_EXECUTABLE
+NAMES cmake
+NAMES_PER_DIR
+DOC "GNU CMake")
+
+ExternalProject_Add(
+        extern_nuraft
+
+        #GIT_REPOSITORY "https://gitee.com/funykatebird/NuRaft.git"
+        #GIT_TAG "v1.1.2"
+
+        #URL "${PROJECT_SOURCE_DIR}/NuRaft.zip"
+        #DOWNLOAD_DIR ${NURAFT_SOURCES_DIR}
+        
+        SOURCE_DIR  "${PROJECT_SOURCE_DIR}/NuRaft"
+        #BINARY_DIR ${NURAFT_BINARY_DIR}
+        #BUILD_IN_SOURCE 1 
+
+        PREFIX ${NURAFT_SOURCES_DIR}
+
+        UPDATE_COMMAND ""
+        CMAKE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCMAKE_CXX_FLAGS=${GLOG_CMAKE_CXX_FLAGS}
+        -DCMAKE_CXX_FLAGS_RELEASE=${CMAKE_CXX_FLAGS_RELEASE}
+        -DCMAKE_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}
+        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+        -DCMAKE_C_FLAGS_DEBUG=${CMAKE_C_FLAGS_DEBUG}
+        -DCMAKE_C_FLAGS_RELEASE=${CMAKE_C_FLAGS_RELEASE}
+        -DCMAKE_INSTALL_PREFIX=${NURAFT_INSTALL_DIR}
+        -DCMAKE_INSTALL_LIBDIR=${NURAFT_INSTALL_DIR}/lib
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DBUILD_TESTING=OFF
+        -DDISABLE_SSL=1
+        -DCMAKE_BUILD_TYPE=${THIRD_PARTY_BUILD_TYPE}
+        -DCMAKE_PREFIX_PATH=${NURAFT_INSTALL_DIR}
+        ${EXTERNAL_OPTIONAL_ARGS}
+        CMAKE_CACHE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NURAFT_INSTALL_DIR}
+        -DCMAKE_INSTALL_LIBDIR:PATH=${NURAFT_INSTALL_DIR}/lib
+        -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+        -DCMAKE_BUILD_TYPE:STRING=${THIRD_PARTY_BUILD_TYPE}
+)
+
+
+ADD_LIBRARY(nuraft STATIC IMPORTED GLOBAL)
+SET_PROPERTY(TARGET nuraft PROPERTY IMPORTED_LOCATION ${NURAFT_LIBRARIES})
+ADD_DEPENDENCIES(nuraft extern_nuraft)
+
+
+
+

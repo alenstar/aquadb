@@ -62,6 +62,13 @@ class TupleDescriptor
         //}
         return rc;
     }
+
+    friend std::ostream &operator<< (std::ostream& oss, const TupleDescriptor& o)
+    {
+        oss << "("<< o.id << "," << o.type << "," << o.name << ")";
+        return oss;
+    }
+
 };
 
 class IndexDescriptor
@@ -71,6 +78,23 @@ class IndexDescriptor
     uint16_t type = 0;   // 2 索引类型: 0x01 主键索引，0x02 唯一索引, 0x04 二级索引
     std::vector<uint16_t> fields; // 3 索引字段, 索引字段ID必须在1-255
     std::string name;    // 4 索引名
+
+    friend std::ostream &operator<< (std::ostream& oss, const IndexDescriptor& o)
+    {
+        oss << "{id:"<< o.id << ",type:" << o.type << ",name:" << o.name;
+        oss << ",fields:[";
+        for(size_t i =0; i < o.fields.size(); ++i)
+        {
+            if(i != 0)
+            {
+                oss << ",";
+            }
+            oss << o.fields.at(i);
+        }
+        oss << "]";
+        oss  << "}";
+        return oss;
+    }
 
     inline bool is_primary_key() const { return 0x01 == type;}
 
@@ -145,6 +169,57 @@ class FieldDescriptor
     std::string comment; // 6 注释
     std::string extra;   // 7 扩展字段, json or msgpack or cbor
 
+    friend std::ostream &operator<< (std::ostream& oss, const FieldDescriptor& o)
+    {
+        oss << "{id:"<< o.id << ",name:" << o.name;
+        oss << ",type:" ;
+        switch (o.type)
+        {
+        case FieldType::None:
+            oss << "None";
+            break;
+        case FieldType::Float64:
+            oss << "Float64";
+            break;
+        case FieldType::Float32:
+            oss << "Float32";
+            break;
+        case FieldType::Int64:
+            oss << "Int64";
+            break;
+        case FieldType::Int32:
+            oss << "Int32";
+            break;
+        case FieldType::Int16:
+            oss << "Int16";
+            break;
+        case FieldType::Int8:
+            oss << "Int8";
+            break;
+        case FieldType::FixedString:
+            oss << "FixedString";
+            break;
+        case FieldType::String:
+            oss << "String";
+            break;
+        case FieldType::DateTime:
+            oss << "DateTime";
+            break;
+        default:
+            oss << "Unknown";
+            break;
+        }
+        if (o.len != 0)
+        {
+            oss << "(" << o.len << ")";
+        }
+        oss << ",flags:" << o.flags ;
+        oss << ",comment:" << o.comment;
+        oss << ",extra:" << o.extra;
+        oss  << "}";
+        return oss;
+    }
+
     uint32_t size() const { return len; }
     // 数据类型, long double string
     // uint8_t dtype() const { return 0x0ff & type; }
@@ -206,7 +281,31 @@ class TableDescriptor
      * 2 {name: createtime, id: 0, dtype:int64}
      * 3 {name: modifytime, id: 0, dtype:int64}
      */
-    uint16_t last_field_id = 0; // 7 最新字段id
+    uint16_t last_fid = 0; // 7 最新字段id
+
+
+    friend std::ostream &operator<< (std::ostream& oss, const TableDescriptor& o)
+    {
+        oss << "{id:"<< o.id << ",name:" << o.name;
+        oss << ",fields:[";
+        for(auto i = o.fields.cbegin(); i!=o.fields.cend(); ++i)
+        {
+            if(i != o.fields.cbegin())
+            {
+                oss << ",";
+            }
+            oss << i->second;
+        }
+        oss << "]";
+        if(o._primarykey)
+        {
+            oss << ",pk:" << *(o._primarykey);
+        }
+        oss << ",last_fid:" << o.last_fid ;
+        oss << ",comment:" << o.comment ;
+        oss  << "}";
+        return oss;
+    }
 
     int set_primary_key(std::vector<uint16_t> ids)
     {
@@ -265,7 +364,7 @@ class TableDescriptor
             field.second.serialize(item);
             subobj.insert(field.first, std::move(item));
         }
-        obj.insert(7, Value(last_field_id));
+        obj.insert(7, Value(last_fid));
         return obj.serialize(out);
     }
     int deserialize(const std::vector<uint8_t> &in)
@@ -317,7 +416,7 @@ class TableDescriptor
             fields.emplace(fid, std::move(field));
         }
 
-        if (obj.has(7)) last_field_id = static_cast<uint32_t>(obj.get(1)->to_i32());
+        if (obj.has(7)) last_fid = static_cast<uint32_t>(obj.get(1)->to_i32());
         return rc;
     }
 
@@ -370,13 +469,13 @@ class TableDescriptor
         return &(it->second);
     } 
 
-    void add_field(int id, FieldDescriptor p)
+    void add_field(FieldDescriptor p)
     {
-        fields[id] = p;
+        fields[p.id] = p;
     }
-    uint16_t next_id() { return ++last_field_id;}
+    uint16_t next_id() { return ++last_fid;}
     private:
-    std::string _dbname; // 库名
+    //std::string _dbname; // 库名
     int status = 0; // 表状态, 加锁时使用
     std::vector<IndexDescriptor*> _indexs; // 索引
     IndexDescriptor* _primarykey {nullptr}; // 索引
@@ -403,6 +502,26 @@ class DatabaseDescriptor
      * 3 {name: modifytime, id: 0, dtype:int64}
      */
     uint32_t last_tid = 0; // 7 最后的表id
+
+    friend std::ostream &operator<< (std::ostream& oss, const DatabaseDescriptor& o)
+    {
+        oss << "{id:"<< o.id << ",name:" << o.name << ",version:" << o.version;
+        oss << ",fields:[";
+        for(auto i = o.fields.cbegin(); i!=o.fields.cend(); ++i)
+        {
+            if(i != o.fields.cbegin())
+            {
+                oss << ",";
+            }
+            oss << i->second;
+        }
+        oss << "]";
+        oss << ",last_tid:" << o.last_tid ;
+        oss << ",status:" << o.status;
+        oss << ",comment:" << o.comment ;
+        oss  << "}";
+        return oss;
+    }
 
     MutTableKey get_key(uint32_t metaId) const {
         MutTableKey k;
@@ -564,6 +683,23 @@ inline int field_append_value(const FieldDescriptor *field, const Value *v, MutT
 }
 
 
+
+class BinlogRecord{
+    public:
+enum OperatorType
+{
+    KV_OP_NONE = 0, 
+    KV_APPEND = 1,
+    KV_DELETE = 2,
+};
+    OperatorType type;
+    uint64_t txid;
+    std::string key;
+    std::string val;
+};
+
+
+//////////////////////////////////////////////////////////////
 
 inline int field_default_value(const FieldDescriptor *field, Value *v)
 {

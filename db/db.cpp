@@ -17,6 +17,7 @@ int DBManager::init(const std::string &basepath)
     int rc=  ptr->init(basepath);
     if(rc != 0)
     {
+        LOGE("rocksdb wrapper init failed: %s", basepath.c_str());
         return rc;
     }
 
@@ -153,10 +154,11 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     FieldDescriptor vfield;
     vfield.name = "v";
     vfield.id = tbl->next_id();
-    kfield.type = FieldDescriptor::FieldType::String;
-    tbl->add_field(1, kfield);
-    tbl->add_field(2, vfield);
-    tbl->set_primary_key({1});
+    vfield.type = FieldDescriptor::FieldType::String;
+
+    tbl->add_field(kfield);
+    tbl->add_field(vfield);
+    tbl->set_primary_key({kfield.id});
 
 
     // 
@@ -237,5 +239,20 @@ int DBManager::close_all() { return -1; }
     auto writer = std::make_shared<TableWriter>(db, tbl);
     return writer;
  }
+
+TableDescriptorPtr DBManager::get_table_descriptor(const std::string &dbname, const std::string &tblname)
+{
+     auto db = get_db_descriptor(dbname);
+     if(!db)
+     {
+         return nullptr;
+     }
+     auto tbl = db->get_table(tblname);
+     if(!tbl)
+     {
+         return nullptr;
+     }
+     return tbl;
+}
 
 }

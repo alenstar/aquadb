@@ -52,6 +52,7 @@ class DBManager
 
     TableReaderPtr get_table_reader(const std::string &dbname, const std::string &tblname);
     TableWriterPtr get_table_writer(const std::string &dbname, const std::string &tblname);
+    TableDescriptorPtr get_table_descriptor(const std::string &dbname, const std::string &tblname);
 
   private:
     DBManager() = default;
