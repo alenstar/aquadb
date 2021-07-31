@@ -62,3 +62,6 @@ build
 output
 *.user.*
 .ccls-cache
+
+NuRafft/asio
+
