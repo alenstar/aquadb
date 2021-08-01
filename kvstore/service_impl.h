@@ -121,6 +121,15 @@ class HttpServiceImpl
     int AddServer(int server_id, const std::string& endpoint);
     int ServerList(std::vector<ServerRaftConfig>& out);
 
+    int CreateTrader();
+    int DeleteTrader();
+    int EnterOrder();
+    int CancelOrder();
+    int OrderList();
+    int PositionList();
+    int TraderStatus();
+    int UpdateQuotes();
+
     protected:
     void append_log(aquadb::BinlogRecord* record);
     private:
