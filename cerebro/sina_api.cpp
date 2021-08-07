@@ -7,7 +7,9 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+
 #include "util/common.h"
+#include "util/logdef.h"
 #include "sina_api.h"
 
 
@@ -131,11 +133,11 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
     if (kv.size() != 2) {
         return nullptr;
     }
-    auto quote = std::make_shared<mdlink_api::MarketQuote>();
-    quote->bid.resize(5, 0.0);
-    quote->ask.resize(5, 0.0);
-    quote->bid_vol.resize(5, 0);
-    quote->ask_vol.resize(5, 0);
+    auto quote = mdlink_api::make_quote_ptr();
+    quote->bids.resize(5, 0.0);
+    quote->asks.resize(5, 0.0);
+    quote->bid_vols.resize(5, 0);
+    quote->ask_vols.resize(5, 0);
 
     //memset(quote.get(), 0, sizeof(quote));
 
@@ -145,7 +147,8 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         string code = tmp.back();
         code = SinaApi::convert_to_extend_code(code);
     //    strncmp(quote->code, code.c_str(), 32);
-        strcpy(quote->code, code.c_str());   
+        //strcpy(quote->code, code.c_str());   
+        quote->symbol = std::move(code);
     }
     
     if (kv[1] == "\"\"") {
@@ -165,7 +168,7 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         }
         int i = 1;
         quote->open = atof(values[i++].c_str());
-        quote->pre_close = atof(values[i++].c_str());
+        quote->prev_close = atof(values[i++].c_str());
         quote->last     = atof(values[i++].c_str());
         quote->high     = atof(values[i++].c_str());
         quote->low      = atof(values[i++].c_str());
@@ -173,30 +176,33 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         quote->volume   = atoll(values[i++].c_str());
         quote->turnover = atoll(values[i++].c_str());
 
-        quote->bid_vol[0] = atoll(values[i++].c_str());
-        quote->bid[0]     = atof(values[i++].c_str());
-        quote->bid_vol[1] = atoll(values[i++].c_str());
-        quote->bid[1]     = atof(values[i++].c_str());
-        quote->bid_vol[2] = atoll(values[i++].c_str());
-        quote->bid[2]     = atof(values[i++].c_str());
-        quote->bid_vol[3] = atoll(values[i++].c_str());
-        quote->bid[3]     = atof(values[i++].c_str());
-        quote->bid_vol[4] = atoll(values[i++].c_str());
-        quote->bid[4]     = atof(values[i++].c_str());
+        quote->bid_vols[0] = atoll(values[i++].c_str());
+        quote->bids[0]     = atof(values[i++].c_str());
+        quote->bid_vols[1] = atoll(values[i++].c_str());
+        quote->bids[1]     = atof(values[i++].c_str());
+        quote->bid_vols[2] = atoll(values[i++].c_str());
+        quote->bids[2]     = atof(values[i++].c_str());
+        quote->bid_vols[3] = atoll(values[i++].c_str());
+        quote->bids[3]     = atof(values[i++].c_str());
+        quote->bid_vols[4] = atoll(values[i++].c_str());
+        quote->bids[4]     = atof(values[i++].c_str());
 
-        quote->ask_vol[0] = atoll(values[i++].c_str());
-        quote->ask[0]     = atof(values[i++].c_str());
-        quote->ask_vol[1] = atoll(values[i++].c_str());
-        quote->ask[1]     = atof(values[i++].c_str());
-        quote->ask_vol[2] = atoll(values[i++].c_str());
-        quote->ask[2]     = atof(values[i++].c_str());
-        quote->ask_vol[3] = atoll(values[i++].c_str());
-        quote->ask[3]     = atof(values[i++].c_str());
-        quote->ask_vol[4] = atoll(values[i++].c_str());
-        quote->ask[4]     = atof(values[i++].c_str());
+        quote->ask_vols[0] = atoll(values[i++].c_str());
+        quote->asks[0]     = atof(values[i++].c_str());
+        quote->ask_vols[1] = atoll(values[i++].c_str());
+        quote->asks[1]     = atof(values[i++].c_str());
+        quote->ask_vols[2] = atoll(values[i++].c_str());
+        quote->asks[2]     = atof(values[i++].c_str());
+        quote->ask_vols[3] = atoll(values[i++].c_str());
+        quote->asks[3]     = atof(values[i++].c_str());
+        quote->ask_vols[4] = atoll(values[i++].c_str());
+        quote->asks[4]     = atof(values[i++].c_str());
 
-        quote->date = parse_date(values[i++]);
-        quote->time = parse_time(values[i++]);
+        //quote->date = parse_date(values[i++]);
+        quote->dt = parse_date(values[i++]);
+        int32_t hhmmss = parse_time(values[i++]);
+        // fill ts
+        quote->ts = quote->dt * 1000000L + hhmmss; 
     }
     return quote;
 }
@@ -273,7 +279,7 @@ int SinaApi::get_quotes_by_url(const std::string& url, std::function<bool(mdlink
     {
         // TODO
         auto err = res.error();
-        std::cerr << "status=" << res->status << ",error=" << err << ",url=" << url << std::endl; 
+        std::cerr << "error=" << err << ",url=" << url << std::endl; 
         return static_cast<int>(err);
     }
     else if(res->status == 200)
@@ -306,7 +312,7 @@ int SinaApi::get_quotes_by_url(const std::string& url, std::function<bool(mdlink
             }
         }
         else {
-            std::cerr << "invalid data:" << line << std::endl;
+            LOGE("invalid data:%s", line.c_str());
         }
     }
     return 0;

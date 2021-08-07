@@ -5,65 +5,33 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <cmath>
 #include <cstdlib>
 #include <cstdint>
 #include "httplib/httplib.h"
 #include "util/threadpool.h"
+#include "util/mutex.h"
+
+#include "cerebro_struct.h"
+
 
 namespace mdlink_api {
-    struct MarketQuote {
-        char            code[16];
-        int32_t         date = 0;
-        int32_t         time = 0;
-        double          open = 0;
-        double          high = 0;
-        double          low = 0;
-        double          close = 0;
-        double          last = 0;
-        double          high_limit = 0;
-        double          low_limit = 0;
-        double          pre_close = 0;
-        int64_t         volume = 0;
-        double          turnover = 0;
+    //typedef std::shared_ptr<MarketQuote> MarketQuotePtr;
+    typedef std::shared_ptr<CerebroTickRecord> MarketQuotePtr;
+    typedef std::function<bool(MarketQuotePtr)> quotes_callback_t;
 
-        std::vector<double> bid;
-        std::vector<double> ask;
-        std::vector<int64_t> ask_vol;
-        std::vector<int64_t> bid_vol;
+    template<typename... Ts>
+    std::shared_ptr<CerebroTickRecord> make_quote_ptr(Ts&&... params)
+    {
+        return std::shared_ptr<CerebroTickRecord>(new CerebroTickRecord(std::forward<Ts>(params)...));
+    }
 
-        friend std::ostream &operator<<(std::ostream &oss, const MarketQuote &o) 
-        {
-            oss << o.code <<",";
-            oss << o.date <<",";
-            oss << o.time <<",";
-            oss << o.open <<",";
-            oss << o.high <<",";
-            oss << o.low <<",";
-            oss << o.close <<",";
-            oss << o.last <<",";
-          
-            oss << o.pre_close << ",";
-            oss << o.volume << ",";
-            for(size_t i = 0; i < 5;++i)
-            {
-                oss << o.bid[i] << ",";
-                oss << o.bid_vol[i] << ",";
-                oss << o.ask[i] << ",";
-                oss << o.ask_vol[i] << ",";
-            }
-              oss << o.high_limit <<",";
-            oss << o.low_limit;
-            return oss;
-        }
 
-    };
-    typedef std::shared_ptr<MarketQuote> MarketQuotePtr;
-    typedef std::function<bool(std::shared_ptr<MarketQuote>)> quotes_callback_t;
 
     class MdLinkApi {
     public:
         virtual ~MdLinkApi() = default;
-        virtual int get_quotes(const std::vector<std::string>& codes,std::function<bool(std::shared_ptr<MarketQuote>)> fn) = 0;
+        virtual int get_quotes(const std::vector<std::string>& codes,std::function<bool(MarketQuotePtr)> fn) = 0;
     };
     typedef std::shared_ptr<MdLinkApi> MdLinkApiPtr;
 
@@ -74,45 +42,100 @@ namespace mdlink_api {
         MarketDataBasic();
         virtual ~MarketDataBasic();
         int get_codes(std::vector<std::string>& codes);
+
+        static std::string convert_to_inner_code(const std::string& code);
+        static std::string convert_to_extend_code(const std::string& code);
+
         private:
-        httplib::Client* _cli{nullptr};
-        std::string _url;
+        httplib::Client* cli_{nullptr};
+        std::string url_;
     };
 
     class MarketDataProvider
     {
         public:
-        int init(int size);
+        MarketDataProvider() = default;
+        ~MarketDataProvider() = default;
+
+        int init(int size, const std::string& api_name = "sina");
         int update_codes();
         int update_quotes();
+        int update_quotes(const std::string& code);
+        inline void set_codes(const std::vector<std::string> & codes) {
+            util::RWMutex::WriteLock lck(codes_mtx_);
+            codes_ = std::move(codes);
+        }
 
-        bool on_quote(std::shared_ptr<MarketQuote> quote)
+        bool on_quote(MarketQuotePtr quote)
         {
-            std::cout << *quote << std::endl;
-            for(auto it: _quotes_callbacks)
+                        // TODO
+            if (!std::isnormal(quote->last))
             {
-                it.second(quote);
+                // 无效行情
+                LOGW("invlaid tick: last price invalid, %f, %s", quote->last, quote->symbol.c_str());
+                return true;
+            }
+            {
+                util::RWMutex::WriteLock lck(quotes_mtx_);
+                auto it = quotes_.find(quote->symbol);
+                if(it == quotes_.end())
+                {
+                    quotes_[quote->symbol] = quote;
+                }
+                else {
+                    if(quote->ts <= it->second->ts)
+                    {
+                        // 剔除旧行情
+                        return true;
+                    }
+                }
+            }
+            if(quotes_callback_) {
+                return quotes_callback_(quote);
             }
             return true;
         }
-        void add_quotes_callback(const std::string& name,std::function<bool(std::shared_ptr<MarketQuote>)> fn)
+        void set_quotes_callback(std::function<bool(MarketQuotePtr)> fn)
         {
-            _quotes_callbacks[name] = fn;
+            quotes_callback_ = fn;
+        }
+
+        void clear()
+        {
+                util::RWMutex::WriteLock lck(quotes_mtx_);
+                quotes_.clear();
         }
 
         void wait_for_shutdown()
         {
-            _thpool->WaitAll();
+            thpool_->WaitAll();
         }
 
-        inline const std::vector<std::string>& get_codes() const {return _codes;}
+        inline std::vector<std::string> get_codes() {
+            util::RWMutex::ReadLock lck(codes_mtx_);
+            std::vector<std::string> codes = codes_;
+            return codes;
+            }
+        protected:
+            MdLinkApiPtr get_mdlink_api();
+
         private:
-        int _pool_size{4};
-        std::vector<std::string> _codes;
-        std::map<std::string, quotes_callback_t> _quotes_callbacks;
-        MarketDataBasic _basic; 
-        //std::vector<MdLinkApiPtr> _sina_api;
-        //std::vector<MdLinkApiPtr> _tencent_api;
-        std::unique_ptr<util::ThreadPool> _thpool;
+        int pool_size_{4};
+        std::string api_name_{"sina"};
+
+        std::vector<std::string> codes_;
+        util::RWMutex codes_mtx_;
+
+        std::map<std::string, MarketQuotePtr> quotes_;
+        util::RWMutex quotes_mtx_;
+
+        quotes_callback_t quotes_callback_;
+        MarketDataBasic basic_; 
+
+        //std::vector<MdLinkApiPtr> quotes_api_;
+        std::map<size_t,MdLinkApiPtr> quotes_api_;
+        util::Mutex api_mtx_;
+
+        std::unique_ptr<util::ThreadPool> thpool_;
     };
 }

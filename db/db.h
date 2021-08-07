@@ -40,6 +40,7 @@ class DBManager
     }
     int create(const std::string &dbname);
     int create_kv_table(const std::string &dbname, const std::string &tblname);
+    int create_table(const std::string &dbname, TableDescriptorPtr& descriptor, bool if_not_exists = false);
     int close(const std::string &dbname);
     int close(const char *dbname)
     {

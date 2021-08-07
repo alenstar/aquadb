@@ -31,6 +31,7 @@ limitations under the License.
 #include <gflags/gflags.h>
 
 DEFINE_int32(server_id, 1, "server id");
+DEFINE_int32(datacenter_id, 1, "datacenter id");
 DEFINE_string(listen,"0.0.0.0:9999", "http service listen address");
 DEFINE_string(endpoint,"127.0.0.1:9900", "raft endpoint");
 
@@ -51,6 +52,11 @@ int init_raft(GlobalContext* ctx) {
     // ASIO options.
     nuraft::asio_service::options asio_opt;
     asio_opt.thread_pool_size_ = 4;
+
+
+    // uuid 
+    ctx->order_id_gen.init(ctx->server_id_, FLAGS_datacenter_id);
+    ctx->trader_id_gen.init(ctx->server_id_, FLAGS_datacenter_id);
 
     // Raft parameters.
     nuraft::raft_params params;

@@ -377,8 +377,8 @@ int TableReader::prev()
         TableDescriptorPtr tbdesc = std::make_shared<TableDescriptor>();
         auto v = _iter->value();
         BufferView buf(v.data(), v.size());
-        TupleRecord trecord;
-        trecord.deserialize(buf);
+        _record.clear();
+        _record.deserialize(buf);
 
         bool firstdo = (_names.size() == 0);
         _values.clear();
@@ -389,9 +389,9 @@ int TableReader::prev()
             {
                 _names.push_back(it.second.name);
             }
-            if (trecord.has(it.first))
+            if (_record.has(it.first))
             {
-                _values.emplace_back(std::move(trecord.at(it.first)));
+                _values.emplace_back(std::move(_record.at(it.first)));
             }
             else
             {
@@ -406,9 +406,65 @@ int TableReader::prev()
 }
 
 
+int TableReader::get(const std::vector<Value>& pk, TupleRecord& record)
+{
+    if (pk.size() != _tbl->get_primary_key()->fields.size())
+    {
+        _errmsg = "Index description and value do not match";
+        return ERR_INVALID_PARAMS;
+    }
+    MutTableKey mutkey;
+    mutkey.append_u32(_db->id);
+    mutkey.append_u32(_tbl->id);
+
+    size_t sz = pk.size();
+    for (size_t i = 0; i < sz; ++i)
+    {
+        field_append_value(_tbl->get_field_descriptor(_tbl->get_primary_key()->fields.at(i)), &(pk.at(i)), mutkey);
+    }
+
+    std::string value;
+    auto ptr = RocksWrapper::get_instance();
+    rocksdb::Slice k(mutkey.data(), mutkey.size());
+    rocksdb::ReadOptions ropt;
+    auto status = ptr->get(ropt, ptr->get_data_handle(), k, &value);
+    if (!status.ok())
+    {
+        // error
+        _errmsg = status.ToString();
+        return ERR_NOT_FOUND;
+    }
+
+    TableDescriptorPtr tbdesc = std::make_shared<TableDescriptor>();
+    BufferView buf(value.data(), value.size());
+    record.deserialize(buf);
+
+    return 0;
+}
 int TableReader::get(const std::vector<Value>& pk, std::vector<Value>& row)
 {
-    return -1;
+    TupleRecord record;
+    int rc = get(pk, record);
+    if(rc != 0)
+    {
+        return rc;
+    }
+    // TODO
+    for (auto it : _tbl->fields)
+    {
+            if (record.has(it.first))
+            {
+                row.emplace_back(std::move(record.at(it.first)));
+            }
+            else
+            {
+                // TODO for default value
+                Value v;
+                field_default_value(&(it.second), &v);
+                row.emplace_back(std::move(v));
+            }
+        }
+    return rc;
 }
 
 int TableReader::get(const Value& key, Value& val)

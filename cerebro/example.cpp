@@ -9,7 +9,7 @@ int main(int argc ,char* argv[])
 {
     int rc =0 ;
     std::vector<std::string> codes;//{"sz000001","sh600001","sh688681","sh688680"};
-    auto mdlink = mdlink_api::MarketDataProvider();
+    mdlink_api::MarketDataProvider mdlink;
     mdlink.init(8);
     rc = mdlink.update_codes();
     if(rc != 0)

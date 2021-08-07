@@ -3,7 +3,7 @@ namespace aquadb
 {
 
     enum ErrCode {
-        ERR_Ok = 0,
+        ERR_OK = 0,
         ERR_UNKNOWN = 100,
         ERR_NOT_FOUND = 101,
         ERR_DB_NOT_FOUND = 102,

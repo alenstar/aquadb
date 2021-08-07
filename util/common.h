@@ -192,6 +192,22 @@ bool almost_nq(T x, T y, int ulp = 6)
     }
 }
 
+
+template<typename T>
+bool almost_ne(T x, T y, int ulp = 6)
+{
+    if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    return !(std::fabs(x-y) <= std::numeric_limits<T>::epsilon() * std::fabs(x+y) * ulp
+        // unless the result is subnormal
+        || std::fabs(x-y) < std::numeric_limits<T>::min());
+    }
+    else {
+        return x != y;
+    }
+}
+
 template<typename T>
 bool almost_lt(T x, T y, int ulp = 6)
 {
@@ -332,6 +348,14 @@ private:
 };
 */
 
+
+template<typename T, typename... Ts>
+std::unique_ptr<T> make_unique(Ts&&... params)
+{
+    return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
+}
+
+
 /**
  * @brief  基础工具类，提供了一些非常基本的函数使用.
  *
@@ -380,7 +404,7 @@ std::string trimright( const std::string &sStr, const std::string &s = " \r\n\t"
  * @param sString  字符串
  * @return std::string  转换后的字符串
  */
-static inline std::string lower( const std::string &s ) {
+inline std::string lower( const std::string &s ) {
     std::string sString = s;
     for ( std::string::iterator iter = sString.begin(); iter != sString.end(); ++iter ) {
         *iter = std::tolower( *iter );
@@ -396,7 +420,7 @@ static inline std::string lower( const std::string &s ) {
  * @param sString  字符串
  * @return std::string  转换后的大写的字符串
  */
-static inline std::string upper( const std::string &s ) {
+inline std::string upper( const std::string &s ) {
     std::string sString = s;
 
     for ( std::string::iterator iter = sString.begin(); iter != sString.end(); ++iter ) {
@@ -731,6 +755,42 @@ bool istartswith( std::string const &value, std::string const &starting );
 bool        iendswith( std::string const &value, std::string const &ending );
 std::string stripspaces( const std::string &str );
 std::string stripquotes( const std::string &s );
+
+
+//////////////////////////////////////////////////////////
+
+inline bool startswith(const std::string &value, const std::string &starting)
+{
+    if (starting.size() > value.size()) return false;
+    return std::equal(starting.begin(), starting.end(), value.begin());
+}
+
+inline bool endswith(const std::string &value, const std::string &ending)
+{
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+inline bool equalsignorecase(const std::string &str1, const std::string &str2)
+{
+    return lower(str1) == lower(str2);
+}
+
+inline bool istartswith(const std::string &value, const std::string &starting)
+{
+    if (starting.size() > value.size()) return false;
+    std::string temp = value.substr(0, starting.size());
+    return equalsignorecase(lower(starting), lower(temp));
+}
+
+inline bool iendswith(const std::string &value, const std::string &ending)
+{
+    if (ending.size() > value.size()) return false;
+    std::string temp =
+        value.substr(value.size() - ending.size(), ending.size());
+    return equalsignorecase(lower(ending), lower(temp));
+}
+
 
 //////////////////////////////////////////////////////////
 

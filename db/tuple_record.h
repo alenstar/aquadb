@@ -71,6 +71,8 @@ class TupleRecord
     bool has(int tag) const;
     size_t size() const;
     void clear() ;
+
+    const std::map<int, Value>& values() const {return _values;}
   private:
     TupleRecord &operator=(const TupleRecord &c);
 

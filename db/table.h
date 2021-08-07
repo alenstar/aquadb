@@ -47,25 +47,28 @@ class TableReader
     ~TableReader() = default;
 
     int seek_to_first(const IndexDescriptor* index, const std::vector<Value>& key);
-    int seek_to_first() {
+    inline int seek_to_first() {
          std::vector<Value> key;
         return seek_to_first(_tbl->get_primary_key(), key);
     }
 
     int seek_to_last(const IndexDescriptor* index, const std::vector<Value>& key);
-    int seek_to_last()
+    inline int seek_to_last()
     {
         std::vector<Value> key;
         return seek_to_first(_tbl->get_primary_key(), key);
     }
 
     int seek_to(const IndexDescriptor* index,  const std::vector<Value>& key,bool prefix = false);
+    inline int seek_to(const std::vector<Value>& key,bool prefix = false) { return seek_to(_tbl->get_primary_key(), key, prefix);}
 
     int next();
     int prev();
 
     int get(const std::vector<Value>& pk, std::vector<Value>& row);
     int get(const Value& key, Value& val);
+    int get(const std::vector<Value>& pk, TupleRecord& record);
+    inline int get(Value& key, TupleRecord& record) { return get({key}, record);}
 
     inline const std::vector<std::string>& get_columns() const { return _names;}
     inline const std::vector<Value>& get_current_row() const { return _values;}
@@ -80,6 +83,7 @@ private:
     MutTableKey _mutkey;
     std::vector<std::string> _names;
     std::vector<Value> _values;
+    TupleRecord _record;
     std::string _errmsg;
 };
 typedef std::shared_ptr<TableReader> TableReaderPtr;

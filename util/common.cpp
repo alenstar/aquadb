@@ -510,37 +510,6 @@ void getrandomhexchars(char *p, unsigned int len)
         p[j] = chars[p[j] & 0x0F];
 }
 
-bool startswith(const std::string &value, const std::string &starting)
-{
-    if (starting.size() > value.size()) return false;
-    return std::equal(starting.begin(), starting.end(), value.begin());
-}
-
-bool endswith(const std::string &value, const std::string &ending)
-{
-    if (ending.size() > value.size()) return false;
-    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-}
-
-bool equalsignorecase(const std::string &str1, const std::string &str2)
-{
-    return lower(str1) == lower(str2);
-}
-
-bool istartswith(const std::string &value, const std::string &starting)
-{
-    if (starting.size() > value.size()) return false;
-    std::string temp = value.substr(0, starting.size());
-    return equalsignorecase(lower(starting), lower(temp));
-}
-
-bool iendswith(const std::string &value, const std::string &ending)
-{
-    if (ending.size() > value.size()) return false;
-    std::string temp =
-        value.substr(value.size() - ending.size(), ending.size());
-    return equalsignorecase(lower(ending), lower(temp));
-}
 
 // Turns "  hello " into "hello". Also handles tabs.
 std::string stripspaces(const std::string &str)

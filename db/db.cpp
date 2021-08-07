@@ -161,7 +161,7 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     tbl->set_primary_key({kfield.id});
 
 
-    // 
+    // build table metainfo key and value
     auto k = tbl->get_key(kMetaTableId, db->id);
     auto v = tbl->get_val();
     rocksdb::Slice key(k.data(), k.size());
@@ -195,6 +195,59 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     }
 
 return 0;
+}
+
+int DBManager::create_table(const std::string &dbname, aquadb::TableDescriptorPtr& descriptor, bool if_not_exists)
+{
+    auto db = get_db_descriptor(dbname);
+    if(!db)
+    {
+        return ERR_DB_NOT_FOUND;
+    }
+    
+    if(db->exists(descriptor->name))
+    {
+        // TODO
+        return if_not_exists ? ERR_OK : ERR_ALREADY_EXISTS;
+    }
+
+    // build table metadata
+    auto tbl =  descriptor; // std::make_shared<TableDescriptor>(descriptor);
+    tbl->id = db->next_id();  // init table id
+
+    // build table metainfo key and value
+    auto k = tbl->get_key(kMetaTableId, db->id);
+    auto v = tbl->get_val();
+    rocksdb::Slice key(k.data(), k.size());
+    rocksdb::Slice val(reinterpret_cast<const char*>(v.data()), v.size());
+
+    auto ptr = RocksWrapper::get_instance();
+    auto handle = ptr->get_meta_info_handle();
+    
+    /*
+    auto txndb = ptr->get_db();
+    rocksdb::WriteOptions wopt;
+    auto txn = txndb->BeginTransaction(wopt);
+    myrocksdb::Transaction mytxn(txn);
+    
+    auto status = mytxn.Put(handle, key, val);
+    mytxn.Commit();
+    */
+
+    rocksdb::WriteOptions wopt;
+    auto status = ptr->put(wopt, handle, key, val);
+    if(!status.ok())
+    {
+        LOGE("put error: %s", status.getState());
+        return static_cast<int>(status.code());
+    }
+    else 
+    {
+        // TODO
+        // lock scope
+        db->add_table(tbl->name, tbl);
+    }
+    return 0;
 }
 
 bool DBManager::exists(const std::string& dbname)

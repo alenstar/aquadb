@@ -18,7 +18,7 @@ inline int request(httplib::Client *cli, const char *url, std::string &body)
     {
         // TODO
         auto err = res.error();
-        std::cerr << "status=" << res->status << ",error=" << err << ",url=" << url << std::endl;
+        std::cerr << "error=" << err << ",url=" << url << std::endl;
         return static_cast<int>(err);
     }
     else if (res->status == 200)
@@ -41,14 +41,14 @@ inline int request(httplib::Client *cli, const char *url, std::string &body)
 MarketDataBasic::MarketDataBasic()
 {
     // http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?node=sh_a&page=100&num=15
-    _url = "/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?node=%s&page=%d&num=%d";
-    _cli = new httplib::Client("http://vip.stock.finance.sina.com.cn");
-    _cli->set_keep_alive(true);
-    _cli->set_tcp_nodelay(true);
-    _cli->set_follow_location(true);
-    _cli->set_decompress(true);
-    _cli->set_url_encode(false);
-    _cli->set_default_headers(
+    url_ = "/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?node=%s&page=%d&num=%d";
+    cli_ = new httplib::Client("http://vip.stock.finance.sina.com.cn");
+    cli_->set_keep_alive(false);
+    cli_->set_tcp_nodelay(false);
+    cli_->set_follow_location(true);
+    cli_->set_decompress(true);
+    cli_->set_url_encode(false);
+    cli_->set_default_headers(
         {{"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"},
          {"Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"},
          {"User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0"},
@@ -59,8 +59,39 @@ MarketDataBasic::MarketDataBasic()
     //  _cli->set_proxy("192.168.53.99", 8888);
 }
 MarketDataBasic::~MarketDataBasic() {
-    delete _cli;
+    delete cli_;
 }
+std::string MarketDataBasic::convert_to_inner_code(const std::string& code)
+{
+    if(util::endswith(code, ".SH"))
+    {
+        return std::string("sh") + code.substr(0,6);
+    }
+    else if(util::endswith(code, ".SZ"))
+    {
+        return std::string("sz") + code.substr(0,6);
+    }
+    else {
+        return code;
+    }
+}
+
+std::string MarketDataBasic::convert_to_extend_code(const std::string& code)
+{
+    if(util::startswith(code, "sh"))
+    {
+        return code.substr(2,6) + ".SH";
+    }
+    else if(util::startswith(code, "sz"))
+    {
+        return code.substr(2,6) + ".SZ";
+    }
+    else {
+        return code;
+    }
+}
+
+
 int MarketDataBasic::get_codes(std::vector<std::string> &codes)
 {
     size_t sha_num = 0;
@@ -70,7 +101,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
     {
         std::string url = "/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=sz_a";
                 std::string out;
-        int rc = request(_cli, url.c_str(), out);
+        int rc = request(cli_, url.c_str(), out);
         if (rc != 0)
         {
             // TODO
@@ -84,8 +115,8 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
         {
             std::string body;
             char url_buf[256] = {0x0};
-            snprintf(url_buf, sizeof(url_buf) - 1, _url.c_str(), "sz_a", i, PAGE_SIZE);
-            rc = request(_cli, url_buf, body);
+            snprintf(url_buf, sizeof(url_buf) - 1, url_.c_str(), "sz_a", i, PAGE_SIZE);
+            rc = request(cli_, url_buf, body);
             if (rc != 0)
             {
                 // TODO
@@ -100,7 +131,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
             if(!js.is_array())
             {
                 // TODO
-                std::cerr << "invalid data:" << body << std::endl;
+                LOGE("invalid data:%s", body.c_str());
                 return -1;
             }
             for(auto const& a: js)
@@ -119,7 +150,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
     {
         std::string url = "/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=sh_a";
         std::string out;
-        int rc = request(_cli, url.c_str(), out);
+        int rc = request(cli_, url.c_str(), out);
         if (rc != 0)
         {
             // TODO
@@ -133,8 +164,8 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
         {
             std::string body;
             char url_buf[256] = {0x0};
-            snprintf(url_buf, sizeof(url_buf) - 1, _url.c_str(), "sh_a", i, PAGE_SIZE);
-            rc = request(_cli, url_buf, body);
+            snprintf(url_buf, sizeof(url_buf) - 1, url_.c_str(), "sh_a", i, PAGE_SIZE);
+            rc = request(cli_, url_buf, body);
             if (rc != 0)
             {
                 // TODO
@@ -149,7 +180,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
             if(!js.is_array())
             {
                 // TODO
-                std::cerr << "invalid data:" << body << std::endl;
+                LOGE("invalid data:%s", body.c_str());
                 return -1;
             }
             for(auto const& a: js)
@@ -166,40 +197,84 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
     return 0;
 }
 
-int MarketDataProvider::init(int size)
+int MarketDataProvider::init(int size, const std::string& api_name)
 {
     if (size > 0)
     {
-        _pool_size = size;
+        pool_size_ = size;
     }
     else 
     {
-        _pool_size = 4;
+        pool_size_ = 4;
     }
-_thpool.reset(new util::ThreadPool(_pool_size));
-//
-//    for(int i = 0; i < _pool_size; ++i)
-//    {
-//        auto sina = std::make_shared<sina_api::SinaApi>();
-//        auto tencent = std::make_shared<tencent_api::TencentApi>();
-//        _sina_api.push_back(sina);
-//        _tencent_api.push_back(tencent);
-//    }
+        if(api_name != "sina" && api_name != "tencent")
+        { 
+            LOGE("unknown api_name:%s", api_name.c_str());
+            return -1;
+        }
+
+    api_name_ = api_name;
+    thpool_.reset(new util::ThreadPool(pool_size_));
+
+    /*
+    for(int i = 0; i < pool_size_; ++i)
+    {
+        mdlink_api::MdLinkApiPtr api = nullptr;
+        if(api_name == "sina")
+        { 
+        api = std::make_shared<sina_api::SinaApi>();
+        }
+        else if(api_name == "tencent") {
+        api = std::make_shared<tencent_api::TencentApi>();
+        }
+        else {
+            LOGE("unknown api_name:%s", api_name.c_str());
+            return -1;
+        }
+       quotes_api_.push_back(api);
+    }
+    */
     return 0;
+}
+
+MdLinkApiPtr MarketDataProvider::get_mdlink_api()
+{
+    auto id = std::hash<std::thread::id>()(std::this_thread::get_id());
+
+    util::Mutex::Lock lck(api_mtx_);
+    auto it = quotes_api_.find(id); 
+    if(it == quotes_api_.end())
+    {
+        mdlink_api::MdLinkApiPtr api = nullptr;
+        if(api_name_ == "sina")
+        { 
+        api = std::make_shared<sina_api::SinaApi>();
+        }
+        else if(api_name_ == "tencent") {
+        api = std::make_shared<tencent_api::TencentApi>();
+        }
+        quotes_api_[id] = api;
+    }
+    return quotes_api_[id];
 }
 
 
  int MarketDataProvider::update_codes()
  {
      std::vector<std::string> codes;
-    int rc = _basic.get_codes(codes);
+    int rc = basic_.get_codes(codes);
     if(rc != 0)
     {
         LOGE("get_codes failed, rc=%d", rc);
         return rc;
     }
     LOGD("codes.size=%lu",codes.size());
-    _codes = std::move(codes);
+    if(codes.empty())
+    {
+        return 0;
+    }
+    util::RWMutex::WriteLock lck(codes_mtx_);
+    codes_ = std::move(codes);
     return 0;
  }
 
@@ -207,29 +282,25 @@ int MarketDataProvider::update_quotes()
 {
     size_t num = 30;
     std::vector<std::string> codes;
-    size_t sz = _codes.size();
+    std::vector<std::string> mycodes;
+    {
+    util::RWMutex::ReadLock lck(codes_mtx_);
+    mycodes = codes_;
+    }
+    size_t sz = mycodes.size();
     for(size_t i = 0; i < sz; ++i)
     {
-        codes.push_back(_codes.at(i));
+        codes.push_back(mycodes.at(i));
         if(codes.size() == num)
         {
-            auto sina = [this,codes](){
-                sina_api::SinaApi sina;
-                sina.get_quotes(codes, [this](std::shared_ptr<MarketQuote> quote){
+            auto fn = [this,codes](){
+                auto api = get_mdlink_api();
+                api->get_quotes(codes, [this](MarketQuotePtr quote){
                     this->on_quote(quote);
                     return true;
                 } ); 
             };
-            _thpool->AddJob(sina);
-
-            auto tencent = [this,codes](){
-                tencent_api::TencentApi tencent;
-                tencent.get_quotes(codes, [this](std::shared_ptr<MarketQuote> quote){
-                    this->on_quote(quote);
-                    return true;
-                } ); 
-            };
-            _thpool->AddJob(tencent);
+            thpool_->AddJob(fn);
 
             codes.clear();
         }
@@ -237,24 +308,30 @@ int MarketDataProvider::update_quotes()
 
     if(codes.size())
     {
-            auto sina = [this,codes](){
-                sina_api::SinaApi sina;
-                sina.get_quotes(codes, [this](std::shared_ptr<MarketQuote> quote){
+            auto fn = [this,codes](){
+                auto api = get_mdlink_api();
+                api->get_quotes(codes, [this](MarketQuotePtr quote){
                     this->on_quote(quote);
                     return true;
                 } ); 
             };
-            _thpool->AddJob(sina);
+            thpool_->AddJob(fn);
 
-            auto tencent = [this,codes](){
-                tencent_api::TencentApi tencent;
-                tencent.get_quotes(codes, [this](std::shared_ptr<MarketQuote> quote){
+    }
+    return 0;
+}
+
+int MarketDataProvider::update_quotes(const std::string& code)
+{
+    auto c = MarketDataBasic::convert_to_inner_code(code);
+            auto fn = [this,c](){
+                auto api = get_mdlink_api();
+                api->get_quotes({c}, [this](MarketQuotePtr quote){
                     this->on_quote(quote);
                     return true;
                 } ); 
             };
-            _thpool->AddJob(tencent);
-    }
+            thpool_->AddJob(fn);
     return 0;
 }
 

@@ -1,6 +1,9 @@
 #pragma once
+#include <cstdint>
+#include <memory>
 #include "util/common.h"
 #include "util/logdef.h"
+#include "nlohmann/json.hpp"
 
 typedef std::string Symbol;
 
@@ -12,66 +15,97 @@ class CerebroPortfolio
   public:
     // accounts // 账户字典
     // TODO
-    double cash;               // 可用资金
-    double daily_pnl;          // 当日盈亏
-    double annualized_returns; // 累计年化收益率
-    double daily_returns;      // 当前最新一天的日收益
+    double cash = 0;               // 可用资金
+    double daily_pnl = 0;          // 当日盈亏
+    double annualized_returns = 0; // 累计年化收益率
+    double daily_returns = 0;      // 当前最新一天的日收益
 
-    double frozen_cash;           // 冻结资金
-    double market_value;          // 市值
-    double pnl;                   // 收益
-    double portfolio_value;       // 总权益
-    int start_date;               // 策略投资组合的开始日期
-    double starting_cash;         // 初始资金
-    double static_unit_net_value; // 昨日净值
+    double frozen_cash = 0;           // 冻结资金
+    double market_value = 0;          // 市值
+    double pnl = 0;                   // 收益
+    double portfolio_value = 0;       // 总权益
+    int start_date = 0;               // 策略投资组合的开始日期
+    double starting_cash = 0;         // 初始资金
+    double static_unit_net_value = 0; // 昨日净值
 
-    double total_returns;    //
-    double total_value;      //
-    double transaction_cost; // 交易成本（税费）
-    double unit_net_value;   // 实时净值, 根据净值计算累积收益
-    double units;            // 份额 
+    double total_returns = 0;    //
+    double total_value = 0;      //
+    double transaction_cost = 0; // 交易成本（税费）
+    double unit_net_value = 0;   // 实时净值, 根据净值计算累积收益
+    double units = 0;            // 份额 
 };
 
 // 账户-多种持仓和现金的集合
 class CerebroAccount
 {
   public:
-    // int64_t id;
-    // int dt;
+    // int64_t id = 0;
+    // int dt = 0;
     // 总保证金
-    double margin;
+    double margin = 0;
     // 多方向保证金
-    double buy_margin;
+    double buy_margin = 0;
     // 空方向保证金
-    double sell_margin;
+    double sell_margin = 0;
     // 可用资金
-    double cash;
-    // 账户总资金 (总资产=账户总资金+市值)
-    double total_cash;
-    // 当日盈亏
-    double daily_pnl;
+    double cash = 0;
+    // 账户总资金 (总资产=可用资金+冻结资金)
+    // double total_cash = 0;
+    // 当日盈亏(根据行情变化来更新，结算后清零)
+    double daily_pnl = 0;
     // 总权益
-    double equity;
+    double equity = 0;
     // 冻结资金
-    double frozen_cash;
-    // 市值
-    double market_value;
-    // 昨仓盈亏
-    double position_pnl;
+    double frozen_cash = 0;
+    // 市值 (交易导致市值变化)
+    double market_value = 0;
+    // 持仓盈亏 (结算时更新)
+    double position_pnl = 0;
     // 账户总权益
-    double total_value;
-    // 交易盈亏
-    double trading_pnl;
+    // double total_value = 0;
+    // 交易盈亏 (平仓时计算)
+    double trading_pnl = 0;
     // 总费用
-    double transaction_cost;
+    double transaction_cost = 0;
 
     // 份额
-    double units; // 初次入金时， 值为 total_cash; 后面中途入金 份额 = (units*unit_value + into_cash)/单位价值
+    double units = 0; // 初次入金时， 值为 total_cash; 后面中途入金 份额 = (units*unit_value + into_cash)/单位价值
     // 单位价值
-    double unit_value;  // 初次入金时， 值为1
+    double unit_value = 0;  // 初次入金时， 值为1
 
     // 根据计算当前不超过 trade_amount 的最大可平仓量
     int calc_close_today_amount();
+
+    // 账户总资金 (总资产=可用资金+冻结资金+市值)
+    inline double total_cash() const { return cash + frozen_cash;}
+    // 账户总权益
+    inline double total_value() const {return total_cash() + market_value;}
+    // 当前市值
+    inline double current_market_value() const {return market_value + daily_pnl;}
+
+    nlohmann::json to_json() const {
+      nlohmann::json js;
+      js["margin"] = margin;
+      js["buy_margin"] = buy_margin;
+      js["sell_margin"] = sell_margin;
+      js["cash"] = cash;
+      js["total_cash"] = total_cash();
+      js["daily_pnl"] = daily_pnl;
+      js["equity"] = equity;
+      js["frozen_cash"] = frozen_cash;
+      js["market_value"] = market_value;
+      js["position_pnl"] = position_pnl;
+      js["total_value"] = total_value();
+      js["trading_pnl"] = trading_pnl;
+      js["transaction_cost"] = transaction_cost;
+      js["units"] = units;
+      js["unit_value"] = unit_value;
+      return js;
+    }
+    std::string to_json_string() const {
+      auto js = to_json();
+      return js.dump();
+    }
 };
 
 // 持仓方向
@@ -121,8 +155,10 @@ enum class ORDER_ACTION
 
     // 分红送股可以视作特殊的订单类型, 这样来保证账户资产变动的连续性
     DIVIDEND = 101, // 分红
-    // 
-    BONUS_SHARES = 102 //红利股/送股
+    // 入金
+    DEPOSIT = 103,
+    // 出金
+    WITHDRAW = 104
 
 };
 
@@ -159,56 +195,94 @@ enum class ORDER_STATUS
     REJECTED = 5
 };
 
+// 行情类型
+enum class QUOTES_TYPE { TICK = 0, MIN1 = 60, MIN5 = 60 * 5, MIN15 = 60 * 15, DAY = 60 * 60 * 24 };
+enum class STRATEGY_RUN_TYPE { NONE = 0, BACKTEST = 1, SIMULATE = 2, ACTUAL = 3 };
+
 class CerebroOrder
 {
   public:
     // 成交均价
-    double filled_price;
+    double filled_price = 0;
 
     // 创建时间
-    long long ctime;
+    long long ctime = 0;
     // 修改时间
-    long long mtime;
+    long long mtime = 0;
     // 已成交量
-    double filled_quantity;
+    double filled_quantity = 0;
     // 未成交量
-    double unfilled_quantity;
+    double unfilled_quantity = 0;
     // 冻结价格
-    double frozen_price;
-    // 消息
+    double frozen_price = 0;
+    // 消息 (下单是填充)
     std::string message;
-
+    // 原因 (撮合时，系统填充, 用于描述未成交原因)
+    std::string reason;
     // 合约
     Symbol symbol;
     // 订单id
-    long long order_id;
+    long long order_id = 0;
     // 母单id
-    // long long base_order_id;
+    // long long base_order_id = 0;
 
     // 订单开平
     // POSITION_EFFECT position_effect;
 
     // 订单价格
-    double price;
+    double price = 0;
 
     // 订单量
-    double quantity;
+    double quantity = 0;
 
     // 扩展字段
     std::map<std::string, std::string> extra; // base_oid 母单order_id 部分成交时子单填写母单order_id; 
 
     // 订单动作/方向
-    ORDER_ACTION action;
+    ORDER_ACTION action = ORDER_ACTION::NONE;
     // 状态
-    ORDER_STATUS status;
+    ORDER_STATUS status = ORDER_STATUS::NONE;
     // 订单类型
-    ORDER_TYPE type;
+    ORDER_TYPE type = ORDER_TYPE::NONE;
 
     // 订单日期
-    int trading_date;
+    int trading_date = 0;
 
     // 费用
-    double transaction_cost;
+    double transaction_cost = 0;
+
+    nlohmann::json to_json() const {
+      nlohmann::json js;
+      js["filled_price"] = filled_price;
+      js["ctime"] = ctime;
+      js["mtime"] = mtime;
+      js["filled_quantity"] = filled_quantity;
+      js["unfilled_quantity"] = unfilled_quantity;
+      js["frozen_price"] = frozen_price;
+      js["symbol"] = symbol;
+      js["order_id"] = order_id;
+      js["price"] = price;
+      js["quantity"] = quantity;
+      js["action"] = action;
+      js["status"] = status;
+      js["type"] = type;
+      js["trading_date"] = trading_date;
+      js["transaction_cost"] = transaction_cost;
+      return js;
+    }
+    std::string to_json_string() const {
+      auto js = to_json();
+      return js.dump();
+    }
+
+            static nlohmann::json to_json(const std::vector<CerebroOrder>& poss) {
+        nlohmann::json::array_t arr;
+        for(auto const& p: poss)
+        {
+          arr.emplace_back(p.to_json());
+        }
+        return arr;
+        }
 };
 
 // 持仓
@@ -218,22 +292,22 @@ class CerebroPosition
     // 可平仓位
     double closable = 0;
     // 当前持仓的方向
-    POSITION_DIRECTION direction;
+    POSITION_DIRECTION direction = POSITION_DIRECTION::NONE;
     // 当前持仓所占的保证金
     double margin = 0;
     // 当前持仓的市值
-    double market_value = 0;
+    //double market_value = 0;
     // 当前持仓的标的
     Symbol symbol;
     // 持仓累积盈亏
     double pnl = 0;
-    // 当前持仓当日持仓盈亏
+    // 当前持仓盈亏
     double position_pnl = 0;
     // 当前持仓量
     double quantity = 0;
     // 今仓中的可平仓位
     double today_closable = 0;
-    // 当前持仓当日的交易盈亏
+    // 持仓交易盈亏(平仓时计算)
     double trading_pnl = 0;
 
     // 持仓均价
@@ -242,7 +316,46 @@ class CerebroPosition
     double commissions = 0.0;
 
     // 持仓价值 avg_price * quantity
-    double totalCommited = 0.0;
+
+    // xxxx 
+    double total_commited = 0.0;
+
+    // 当前持仓的市值
+    inline double market_value() const {
+      return avg_price * quantity;
+    }
+    
+    nlohmann::json to_json() const {
+      nlohmann::json js;
+      js["closable"] = closable;
+      js["direction"] = direction;
+      js["margin"] = margin;
+      js["market_value"] = market_value();
+      js["symbol"] = symbol;
+      js["pnl"] = pnl;
+      js["position_pnl"] = position_pnl;
+      js["quantity"] = quantity;
+      js["today_closable"] = today_closable;
+      js["trading_pnl"] = trading_pnl;
+      js["avg_price"] = avg_price;
+      js["commissions"] = commissions;
+      return js;
+    }
+
+    std::string to_json_string() const {
+      auto js = to_json();
+      return js.dump();
+    }
+
+        static nlohmann::json to_json(const std::vector<CerebroPosition>& poss) {
+        nlohmann::json::array_t arr;
+        for(auto const& p: poss)
+        {
+          arr.emplace_back(p.to_json());
+        }
+        return arr;
+        }
+
 };
 
 // 交易品种
@@ -299,49 +412,163 @@ class CerebroTickRecord
 {
   public:
     Symbol symbol; // 标的
-    int64_t ts;    // 当前快照数据的时间戳
-    int dt;        // 交易日
+    int64_t ts = 0;    // 当前快照数据的时间戳(毫秒)
+    int32_t dt = 0;        // 交易日 YYYYMMDD
+    //int32_t time; // 时间 HHMMSS
 
     std::vector<double> ask_vols; // 卖出报盘数量，ask_vols[0]代表盘口卖一档报盘数量
     std::vector<double> asks;     // 卖出报盘价格，asks[0]代表盘口卖一档报盘价
     std::vector<double> bid_vols; // 买入报盘数量，bids_vols[0]代表盘口买一档报盘数量
     std::vector<double> bids;     // 买入报盘价格，bids[0]代表盘口买一档报盘价
-    double high;                  // 截止到当前的最高价
-    double last;                  // 当前最新价
-    double low;                   // 截止到当前的最低价
-    double open;                  // 当日开盘价
-    double close;                 // 当前最新价
-    double prev_close;            // 昨日收盘价
-    double total_turnover;        // 截止到当前的成交额
-    double volume;                // 截止到当前的成交量
+    double high = 0;                  // 截止到当前的最高价
+    double last = 0;                  // 当前最新价
+    double low = 0;                   // 截止到当前的最低价
+    double open = 0;                  // 当日开盘价
+    double prev_close = 0;            // 昨日收盘价
+    double turnover = 0;        // 截止到当前的成交额
+    double volume = 0;                // 截止到当前的成交量
 
-    double open_interest;      // 截止到当前的持仓量（期货专用）
-    double prev_open_interest; // 昨日的持仓量（期货专用）
-    double settlement;         // 结算价（期货专用）
-    double prev_settlement;    // 昨日结算价（期货专用）
+    double open_interest = 0;      // 截止到当前的持仓量（期货专用）
+    double prev_open_interest = 0; // 昨日的持仓量（期货专用）
+    double settlement = 0;         // 结算价（期货专用）
+    double prev_settlement = 0;    // 昨日结算价（期货专用）
 
-    double limit_down; // 跌停价
-    double limit_up;   // 涨停价
+    double limit_down = 0; // 跌停价
+    double limit_up = 0;   // 涨停价
+
+    friend std::ostream &operator<<(std::ostream &oss, const CerebroTickRecord &o) 
+    {
+            oss << o.symbol <<",";
+            oss << o.dt <<",";
+            oss << o.ts <<",";
+            oss << o.open <<",";
+            oss << o.high <<",";
+            oss << o.low <<",";
+            //oss << o.close <<",";
+            oss << o.last <<",";
+          
+            oss << o.prev_close << ",";
+            oss << o.volume << ",";
+            for(size_t i = 0; i < 5;++i)
+            {
+                oss << o.bids[i] << ",";
+                oss << o.bid_vols[i] << ",";
+                oss << o.asks[i] << ",";
+                oss << o.ask_vols[i] << ",";
+            }
+              oss << o.limit_up <<",";
+            oss << o.limit_down;
+            return oss;
+    }
+    
+    nlohmann::json to_json() const {
+      nlohmann::json js;
+      js["ts"] = ts;
+      js["dt"] = dt;
+      js["symbol"] = symbol;
+      js["last"] = last;
+      js["high"] = high;
+      js["low"] = low;
+      js["open"] = open;
+      //js["close"] = close;
+      js["prev_close"] = prev_close;
+      js["turnover"] = turnover;
+      js["volume"] = volume;
+      js["bids"] = nlohmann::json::array_t();
+      for(auto a: bids)
+      {
+        js["bids"].push_back(a);
+      }
+      js["bid_vols"] = nlohmann::json::array_t();
+            for(auto a: bid_vols)
+      {
+        js["bid_vols"].push_back(a);
+      }
+      js["asks"] = nlohmann::json::array_t();
+            for(auto a: asks)
+      {
+        js["asks"].push_back(a);
+      }
+      js["ask_vols"] = nlohmann::json::array_t();
+            for(auto a: ask_vols)
+      {
+        js["ask_vols"].push_back(a);
+      }
+
+      js["limit_up"] = limit_up;
+      js["limit_down"] = limit_down;
+      return js;
+    }
+    std::string to_json_string() const {
+      auto js = to_json();
+      return js.dump();
+    }
+    static nlohmann::json to_json(const std::vector<CerebroTickRecord>& records) {
+      nlohmann::json::array_t js;
+      for(auto const& r: records)
+      {
+        js.emplace_back(r.to_json());
+      }
+      return js;
+    }
 };
+typedef std::shared_ptr<CerebroTickRecord> CerebroTickRecordPtr;
 
 class CerebroKlineRecord
 {
   public:
     Symbol symbol;         // 标的
-    int64_t ts;            // 当前快照数据的时间戳
-    int type;              // k线类型 1m 5m 1d
-    double high;           // 截止到当前的最高价
-    double close;          // 当前最新价
-    double low;            // 截止到当前的最低价
-    double open;           // 当日开盘价
-    double prev_close;     // 昨日收盘价
-    double total_turnover; // 截止到当前的成交额
-    double volume;         // 截止到当前的成交
+    int64_t ts = 0;            // 当前快照数据的时间戳
+    int dt = 0;
+    //int type;              // k线类型 1m 5m 1d
+    double high = 0;           // 截止到当前的最高价
+    double close = 0;          // 当前最新价
+    double low = 0;            // 截止到当前的最低价
+    double open = 0;           // 当日开盘价
+    double prev_close = 0;     // 昨日收盘价
+    double turnover = 0; // 截止到当前的成交额
+    double volume = 0;         // 截止到当前的成交
 
-    double open_interest;      // 截止到当前的持仓量（期货专用）
-    double prev_open_interest; // 昨日的持仓量（期货专用）
-    double prev_settlement;    // 昨日结算价（期货专用）
-    double settlement;         // 结算价（期货专用）
+    double open_interest = 0;      // 截止到当前的持仓量（期货专用）
+    double prev_open_interest = 0; // 昨日的持仓量（期货专用）
+    double prev_settlement = 0;    // 昨日结算价（期货专用）
+    double settlement = 0;         // 结算价（期货专用）
+
+
+    nlohmann::json to_json() const {
+      nlohmann::json js;
+      js["ts"] = ts;
+      js["dt"] = dt;
+      js["symbol"] = symbol;
+      //js["type"] = type;
+      js["high"] = high;
+      js["low"] = low;
+      js["open"] = open;
+      js["close"] = close;
+      js["prev_close"] = prev_close;
+      js["turnover"] = turnover;
+      js["volume"] = volume;
+        js["open_interest"] = open_interest;
+        js["prev_open_interest"] = prev_open_interest;
+        js["prev_settlement"] = prev_settlement;
+        js["settlement"] = settlement;
+
+      //js["limit_up"] = limit_up;
+      //js["limit_down"] = limit_down;
+      return js;
+    }
+        std::string to_json_string() const {
+      auto js = to_json();
+      return js.dump();
+    }
+    static nlohmann::json to_json(const std::vector<CerebroKlineRecord>& records) {
+      nlohmann::json::array_t js;
+      for(auto const& r: records)
+      {
+        js.emplace_back(r.to_json());
+      }
+      return js;
+    }
 };
 
 class CerebroTime;
@@ -378,6 +605,23 @@ class CerebroTime final
     int _time; // 时间
 };
 
+class CerebroDate final
+{
+  public:
+    CerebroDate(int dt);
+    CerebroDate(const CerebroDate &ct);
+    int64_t ts() const;
+    int time() const; // 返回时间对象
+    CerebroDate &add_days(int n);
+
+    bool is_trading(CerebroCalendar *cal);
+    CerebroDate next_date(CerebroCalendar *cal, int offset = 0);
+
+  private:
+    int _time; // 时间
+};
+
+
 struct CerebroSeriesValue
 {
     int date;
@@ -406,8 +650,11 @@ struct CerebroConfig
   double comm_rate = 0.0003; //手续费
   double slippage = 1.0; // 滑点
 
+  std::vector<Symbol> symbols; // 关注的标的,  回放行情时使用
   int start_date; // 回测起始日期
   int end_date;// 回测截至日期
+  QUOTES_TYPE qtype = QUOTES_TYPE::TICK; // 撮合行情类型
+  STRATEGY_RUN_TYPE rtype = STRATEGY_RUN_TYPE::BACKTEST;
 };
 
 // 数据推送
@@ -437,6 +684,26 @@ class CerebroDataFeed
     // 接受时间点事件
     int on_timepoint();
 };
+
+class CerebroStrategy
+{
+  public:
+    virtual ~CerebroStrategy() {}
+    virtual void on_market_open(CerebroBroker* broker, int dt) = 0;
+    virtual void on_pre_market_open(CerebroBroker* broker, int dt) = 0;
+    virtual void on_market_close(CerebroBroker* broker, int dt) = 0;
+    virtual void on_aft_market_close(CerebroBroker* broker, int dt) = 0;
+    // virtual void on_aft_market_settle(CerebroBroker* broker, int dt) = 0; // 触发broker处理结算事务
+    virtual void on_tick(CerebroBroker* broker, CerebroTickRecord* tick) = 0;  // 加载tick缓存， 触发用户业务回调on_tick，再触发broker撮合
+    virtual void on_kline(CerebroBroker* broker, CerebroKlineRecord* kline) = 0; // 根据时间点加载k线缓存，再处理用户业务回调on_kline
+    // virtual void on_market_quote_data() = 0; // 市场行情数据, 所有行情数据tick,minute,daily都先经过此函数再到on_tick,on_kline
+    virtual void on_order_update(const CerebroOrder* order);
+
+    const std::string& name() const { return name_;}
+    protected:
+    std::string name_;
+};
+typedef std::shared_ptr<CerebroStrategy> CerebroStrategyPtr;
 
 class CerebroEvent
 {

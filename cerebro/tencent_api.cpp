@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "util/common.h"
+#include "util/logdef.h"
 #include "tencent_api.h"
 
 
@@ -129,11 +130,11 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
     if (kv.size() != 2) {
         return nullptr;
     }
-    auto quote = std::make_shared<mdlink_api::MarketQuote>();
-    quote->bid.resize(5, 0.0);
-    quote->ask.resize(5, 0.0);
-    quote->bid_vol.resize(5, 0);
-    quote->ask_vol.resize(5, 0);
+    auto quote = mdlink_api::make_quote_ptr();
+    quote->bids.resize(5, 0.0);
+    quote->asks.resize(5, 0.0);
+    quote->bid_vols.resize(5, 0);
+    quote->ask_vols.resize(5, 0);
 
     //memset(quote.get(), 0, sizeof(quote));
 
@@ -143,7 +144,8 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         string code = tmp.back();
         code = TencentApi::convert_to_extend_code(code);
     //    strncmp(quote->code, code.c_str(), 32);
-        strcpy(quote->code, code.c_str());   
+        //strcpy(quote->code, code.c_str());   
+        quote->symbol = std::move(code);
     }
     
     if (kv[1] == "\"\"") {
@@ -163,36 +165,38 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         }
 		int i = 3;
 		quote->last = atof(values[i++].c_str());
-		quote->pre_close = atof(values[i++].c_str());
+		quote->prev_close = atof(values[i++].c_str());
 		quote->open = atof(values[i++].c_str());
 		quote->volume = atoll(values[i++].c_str()) * 100;
 		i += 2; // ignore the outer, inner
 
-		quote->bid[0] = atof(values[i++].c_str());
-		quote->bid_vol[0] = atoi(values[i++].c_str()) * 100;
-		quote->bid[1] = atof(values[i++].c_str());
-		quote->bid_vol[1] = atoi(values[i++].c_str()) * 100;
-		quote->bid[2] = atof(values[i++].c_str());
-		quote->bid_vol[2] = atoi(values[i++].c_str()) * 100;
-		quote->bid[3] = atof(values[i++].c_str());
-		quote->bid_vol[3] = atoi(values[i++].c_str()) * 100;
-		quote->bid[4] = atof(values[i++].c_str());
-		quote->bid_vol[4] = atoi(values[i++].c_str()) * 100;
+		quote->bids[0] = atof(values[i++].c_str());
+		quote->bid_vols[0] = atoi(values[i++].c_str()) * 100;
+		quote->bids[1] = atof(values[i++].c_str());
+		quote->bid_vols[1] = atoi(values[i++].c_str()) * 100;
+		quote->bids[2] = atof(values[i++].c_str());
+		quote->bid_vols[2] = atoi(values[i++].c_str()) * 100;
+		quote->bids[3] = atof(values[i++].c_str());
+		quote->bid_vols[3] = atoi(values[i++].c_str()) * 100;
+		quote->bids[4] = atof(values[i++].c_str());
+		quote->bid_vols[4] = atoi(values[i++].c_str()) * 100;
 
-		quote->ask[0] = atof(values[i++].c_str());
-		quote->ask_vol[0] = atoi(values[i++].c_str()) * 100;
-		quote->ask[1] = atof(values[i++].c_str());
-		quote->ask_vol[1] = atoi(values[i++].c_str()) * 100;
-		quote->ask[2] = atof(values[i++].c_str());
-		quote->ask_vol[2] = atoi(values[i++].c_str()) * 100;
-		quote->ask[3] = atof(values[i++].c_str());
-		quote->ask_vol[3] = atoi(values[i++].c_str()) * 100;
-		quote->ask[4] = atof(values[i++].c_str());
-		quote->ask_vol[4] = atoi(values[i++].c_str()) * 100;
+		quote->asks[0] = atof(values[i++].c_str());
+		quote->ask_vols[0] = atoi(values[i++].c_str()) * 100;
+		quote->asks[1] = atof(values[i++].c_str());
+		quote->ask_vols[1] = atoi(values[i++].c_str()) * 100;
+		quote->asks[2] = atof(values[i++].c_str());
+		quote->ask_vols[2] = atoi(values[i++].c_str()) * 100;
+		quote->asks[3] = atof(values[i++].c_str());
+		quote->ask_vols[3] = atoi(values[i++].c_str()) * 100;
+		quote->asks[4] = atof(values[i++].c_str());
+		quote->ask_vols[4] = atoi(values[i++].c_str()) * 100;
 		i += 1; // ignore last transactions
 
-		quote->date = atoi(values[i].substr(0, 8).c_str()); // YYYYMMDD
-		quote->time = atoi(values[i++].substr(8, 6).c_str()); // hhmmss
+		quote->dt = atoi(values[i].substr(0, 8).c_str()); // YYYYMMDD
+		int32_t hhmmss = atoi(values[i++].substr(8, 6).c_str()); // hhmmss
+        // fill ts
+        quote->ts = quote->dt * 1000000L + hhmmss; 
 		i += 2; // ignore ups and downs
 
         quote->high     = atof(values[i++].c_str());
@@ -308,7 +312,7 @@ int TencentApi::get_quotes_by_url(const std::string& url, std::function<bool(mdl
         }
         else 
         {
-            std::cerr << "invalid data:" << line << std::endl;
+            LOGE("invalid data:%s", line.c_str());
         }
     }
     return 0;
