@@ -2,29 +2,32 @@
 #include "cerebro_broker.h"
 #include "cerebro_recorder.h"
 
-    CerebroBacktest::CerebroBacktest() {
-        broker_ = new CerebroBroker();
+CerebroBacktest::CerebroBacktest() { broker_ = new CerebroBroker(); }
+CerebroBacktest::~CerebroBacktest() { delete broker_; }
+nlohmann::json CerebroBacktest::to_json() const
+{
+    nlohmann::json js;
+    js["id"]   = conf_.aid;
+    js["name"] = conf_.name;
+    if (account_) {
+        js["account"] = account_->to_json();
     }
-    CerebroBacktest::~CerebroBacktest() {
-delete broker_;
-    }
+    return js;
+}
 
-int CerebroBacktest::init(const CerebroConfig& conf)
+int CerebroBacktest::init(const CerebroConfig &conf)
 {
     conf_ = conf;
     // 设置订单更新回调
-    broker_->set_order_update_callback([this](const CerebroOrder& o){
-        for(auto& st: strategys_)
-        {   
+    broker_->set_order_update_callback([this](const CerebroOrder &o) {
+        for (auto &st : strategys_) {
             // FIXME
             // 可根据订单中的扩展字段找到对于的下单策略
             st.second->on_order_update(&o);
         }
     });
     last_order_id_ = 1000000;
-    broker_->set_order_id_generator([this]()->int64_t{
-        return last_order_id_++;
-    });
+    broker_->set_order_id_generator([this]() -> int64_t { return last_order_id_++; });
 
     // 此处账户Id和交易Id保持一样
     account_ = std::make_shared<CerebroAccountWrap>(conf.aid, conf.name);
@@ -43,39 +46,33 @@ int CerebroBacktest::run()
     CerebroQuotePlayer player;
     player.init(conf_.qtype);
 
-    for(int dt = conf_.start_date; dt <= conf_.end_date; ++dt)
-    {
+    for (int dt = conf_.start_date; dt <= conf_.end_date; ++dt) {
         // TODO
         // 跳过非交易日
-        for(auto& st: strategys_)
-        {
+        for (auto &st : strategys_) {
             st.second->on_pre_market_open(broker_, dt);
         }
         // TODO
         int rc = player.seek_to(dt);
-        if(rc != 0)
-        {
+        if (rc != 0) {
             LOGE("not found quotes: trading_date=%d", dt);
             continue;
         }
 
-        for(auto& st: strategys_)
-        {
+        for (auto &st : strategys_) {
             st.second->on_market_open(broker_, dt);
         }
 
         CerebroTickRecordPtr quote;
-        while (quote = player.next())
-        {
-            for(auto& st: strategys_)
-            {
-                if(conf_.qtype != QUOTES_TYPE::TICK) {
+        while (quote = player.next()) {
+            for (auto &st : strategys_) {
+                if (conf_.qtype != QUOTES_TYPE::TICK) {
                     CerebroQuotePlayer::tick_to_kline(*quote, kline);
-                st.second->on_kline(broker_, &kline);
+                    st.second->on_kline(broker_, &kline);
                 }
                 else {
                     // tick to kline
-                st.second->on_tick(broker_, quote.get());
+                    st.second->on_tick(broker_, quote.get());
                 }
             }
 
@@ -83,21 +80,17 @@ int CerebroBacktest::run()
             broker_->on_tick(*quote);
         }
 
-        // 收盘 
-        for(auto& st: strategys_)
-        {
+        // 收盘
+        for (auto &st : strategys_) {
             st.second->on_market_close(broker_, dt);
         }
 
         // 盘后结算
         broker_->settle();
         //收盘后
-        for(auto& st: strategys_)
-        {
+        for (auto &st : strategys_) {
             st.second->on_aft_market_close(broker_, dt);
         }
-
     }
     return 0;
 }
-
