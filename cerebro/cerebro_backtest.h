@@ -28,4 +28,5 @@ class CerebroBacktest
     // CerebroAccountWrapPtr account_{nullptr};
     std::shared_ptr<CerebroAccountWrap> account_{nullptr};
     int64_t last_order_id_{0};
+    int state_ {0};
 };

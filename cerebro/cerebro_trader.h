@@ -21,6 +21,7 @@ class CerebroTrader
         nlohmann::json js;
         js["id"] = id_;
         js["name"] = name_;
+        js["state"] = state_;
         if(account_)
         {
             js["account"] = account_->to_json();
@@ -36,5 +37,6 @@ class CerebroTrader
     std::string name_;
     CerebroAccountWrapPtr account_{nullptr};
     CerebroBroker* broker_{nullptr};
+    int state_ {0};
 };
 typedef std::shared_ptr<CerebroTrader> CerebroTraderPtr;

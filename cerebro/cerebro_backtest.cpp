@@ -9,6 +9,8 @@ nlohmann::json CerebroBacktest::to_json() const
     nlohmann::json js;
     js["id"]   = conf_.aid;
     js["name"] = conf_.name;
+    js["state"] = state_;
+    // js["last_order_id"] = last_order_id_;
     if (account_) {
         js["account"] = account_->to_json();
     }
@@ -31,9 +33,11 @@ int CerebroBacktest::init(const CerebroConfig &conf)
 
     // 此处账户Id和交易Id保持一样
     account_ = std::make_shared<CerebroAccountWrap>(conf.aid, conf.name);
-    // 入初始资金
-    account_->deposit_cash(conf.cash);
     broker_->init(account_);
+    // 入初始资金
+    if(state_ == 0) {
+        broker->deposit_cash(conf.cash);
+    }
 
     broker_->set_matcher("SH", new CerebroSSEMatcher(broker_));
     broker_->set_matcher("SZ", new CerebroSZSEMatcher(broker_));

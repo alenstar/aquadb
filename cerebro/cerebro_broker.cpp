@@ -374,11 +374,11 @@ int CerebroBroker::init(CerebroAccountWrapPtr account)
     _account = account;
 
     // 帐号是初次初始化状态时,为保证订单数据完整性，将帐号资金入金，转换成以完成订单
-    if(_account->is_initial())
-    {
-        // 初次入金，入金订单直接入完成单队列(不重技计算份额)
-        deposit_cash(_account->get_cash(), true);
-    }
+    //if(_account->is_initial())
+    //{
+    //    // 初次入金，入金订单直接入完成单队列(不重技计算份额)
+    //    deposit_cash(_account->get_cash(), true);
+    //}
     return 0;
 }
 
