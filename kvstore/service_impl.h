@@ -16,11 +16,17 @@
 #include "cerebro/snowflake.h"
 #include "cerebro/mdlink.h"
 
+#define KV_RAFT_LOG_TBL "raft_log"
+#define KV_RAFT_CONFIG_TBL "raft_config"
+
 using snowflake_t = snowflake<1627886931000L>;
 
 namespace aquadb{
     class BinlogRecord;
     class DBManager;
+    class TableOperator;
+    class TableReader;
+    class RaftLogStore;
 }
 
 //struct  GlobalContext;
@@ -53,15 +59,18 @@ struct GlobalContext
     // Raft server instance.
     nuraft::ptr<nuraft::raft_server> raft_instance_;
 
-    aquadb::DBManager* db_mgr_{nullptr};
-
     nuraft::raft_params::return_method_type call_type_ =  nuraft::raft_params::blocking;
 
     // uuid for trader
-    snowflake_t trader_id_gen;
+    snowflake_t trader_id_gen_;
 
     // uuid for order
-    snowflake_t order_id_gen;
+    snowflake_t order_id_gen_;
+
+    // rocksdb  
+    aquadb::DBManager* db_mgr_{nullptr};
+    std::shared_ptr<aquadb::RaftLogStore> raft_log_store_;
+    std::shared_ptr<aquadb::TableOperator> get_raft_config_tbl();
 };
 
 

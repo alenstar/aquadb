@@ -128,6 +128,11 @@ public:
         //_data.append(1, '\0');
         return *this;
     }
+    MutTableKey& append_string(const char* val, size_t size) {
+        _data.append(val, size);
+        _data.append('\0');
+        return *this;
+    }
 
     MutTableKey& append_string_prefix(const std::string& val) {
         _data.append(val.data(), val.size());

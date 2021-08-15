@@ -39,11 +39,13 @@ public:
     // create TableKey from a slice, use for extract fields
     TableKey(const Str& key, bool full = true) : 
         _full(full), 
-        _data(key.c_str()) {}
+        _data(key.data(), key.size()) {}
+
+    TableKey(const char* s, size_t size, bool full = false) : _full(full), _data(s, size) {}
 
     TableKey(const TableKey& key) : 
         _full(key._full),
-        _data(key._data.c_str()) {}
+        _data(key._data.data(), key._data.size()) {}
 
     TableKey(const MutTableKey& key);
 

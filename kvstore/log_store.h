@@ -23,11 +23,13 @@ limitations under the License.
 #include <map>
 #include <mutex>
 
+class GlobalContext;
+
 namespace nuraft {
 
 class rocksdb_log_store : public log_store {
 public:
-    rocksdb_log_store();
+    rocksdb_log_store(GlobalContext* ctx);
 
     ~rocksdb_log_store();
 
@@ -68,6 +70,9 @@ private:
     std::map<ulong, ptr<log_entry>> logs_;
     mutable std::mutex logs_lock_;
     std::atomic<ulong> start_idx_;
+    std::atomic<ulong> local_idx_;
+
+    GlobalContext* ctx_;
 };
 
 }

@@ -42,44 +42,44 @@ namespace aquadb
 {
 //////////////////////////////////////////////////////////////////////////
 
-Value::Value() : _sval(nullptr), _size(0), _dtype(0), _isowner(0) {}
-Value::Value(int v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(int64_t v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(uint64_t v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(uint32_t v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(double v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(const std::string &v) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v); }
-Value::Value(const char *v, size_t size) : _sval(nullptr), _size(0), _dtype(0), _isowner(0) { set_value(v, size); }
+Value::Value() : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) {}
+Value::Value(int v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0) , _inlocal(0){ set_value(v); }
+Value::Value(int64_t v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v); }
+Value::Value(uint64_t v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v); }
+Value::Value(uint32_t v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v); }
+Value::Value(double v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v); }
+Value::Value(const std::string &v) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v); }
+Value::Value(const char *v, size_t size) : _sval(nullptr), _size(0), _dtype(0), _isalloc(0), _inlocal(0) { set_value(v, size); }
 
 Value::Value(const Value &cv)
 {
     _size  = cv._size;
     _dtype = cv._dtype;
-    if (cv._isowner) {
+    if (cv._isalloc) {
         _sval = reinterpret_cast<char *>(malloc(cv._size + 1));
         memcpy(_sval, cv._sval, cv._size);
         _sval[cv._size] = '\0';
-        _isowner         = 1;
+        _isalloc         = 1;
     }
     else {
         memcpy(_buffer, cv._buffer, sizeof(int64_t) + sizeof(int32_t));
-        _isowner = 0;
+        _isalloc = 0;
     }
 }
 Value::Value(Value &&cv)
 {
     _size  = cv._size;
     _dtype = cv._dtype;
-    if (cv._isowner) {
-        _isowner = 1;
+    if (cv._isalloc) {
+        _isalloc = 1;
         _sval   = cv._sval;
     }
     else {
-        _isowner = 0;
+        _isalloc = 0;
         memcpy(_buffer, cv._buffer, sizeof(int64_t) + sizeof(int32_t));
     }
     cv._sval   = nullptr;
-    cv._isowner = 0;
+    cv._isalloc = 0;
     cv._size   = 0;
     cv._dtype  = 0;
 }
@@ -92,18 +92,18 @@ Value &Value::operator=(const Value &cv)
 
     _size  = cv._size;
     _dtype = cv._dtype;
-    if (_isowner) {
+    if (_isalloc) {
         free(_sval);
     }
-    if (cv._isowner) {
+    if (cv._isalloc) {
         _sval = reinterpret_cast<char *>(malloc(cv._size + 1));
         memcpy(_sval, cv._sval, cv._size);
         _sval[cv._size] = '\0';
-        _isowner         = 1;
+        _isalloc         = 1;
     }
     else {
         memcpy(_buffer, cv._buffer, sizeof(int64_t) + sizeof(int32_t));
-        _isowner = 0;
+        _isalloc = 0;
     }
     return *this;
 }
@@ -115,20 +115,20 @@ Value &Value::operator=(Value &&cv) noexcept
 
     _size  = cv._size;
     _dtype = cv._dtype;
-    if (_isowner) {
+    if (_isalloc) {
         free(_sval);
     }
 
-    if (cv._isowner) {
-        _isowner = 1;
+    if (cv._isalloc) {
+        _isalloc = 1;
         _sval   = cv._sval;
     }
     else {
-        _isowner = 0;
+        _isalloc = 0;
         memcpy(_buffer, cv._buffer, sizeof(int64_t) + sizeof(int32_t));
     }
     cv._sval   = nullptr;
-    cv._isowner = 0;
+    cv._isalloc = 0;
     cv._size   = 0;
     cv._dtype  = 0;
     return *this;
@@ -142,7 +142,7 @@ void Value::set_value(const std::string &v)
         throw std::invalid_argument("string too big");
     }
 
-    if (_isowner) {
+    if (_isalloc) {
         free(_sval);
     }
     _sval = nullptr;
@@ -150,13 +150,13 @@ void Value::set_value(const std::string &v)
     if (v.size() < (sizeof(int64_t) + sizeof(int32_t))) {
         memcpy(_buffer, v.data(), v.size());
         _buffer[v.size()] = '\0';
-        _isowner = 0;
+        _isalloc = 0;
     }
     else {
         _sval = reinterpret_cast<char *>(malloc(v.size() + 1));
         memcpy(_sval, v.data(), v.size());
         _sval[v.size()] = '\0';
-        _isowner         = 1;
+        _isalloc         = 1;
     }
     _size  = v.size();
     _dtype = 3;
@@ -168,7 +168,7 @@ void Value::set_value(const char *v, size_t size)
         throw std::invalid_argument("string too big");
     }
 
-    if (_isowner) {
+    if (_isalloc) {
         free(_sval);
     }
     _sval = nullptr;
@@ -176,13 +176,13 @@ void Value::set_value(const char *v, size_t size)
     if (size < (sizeof(int64_t) + sizeof(int32_t))) {
         memcpy(_buffer, v, size);
         _buffer[size] = '\0';
-        _isowner = 0;
+        _isalloc = 0;
     }
     else {
         _sval = reinterpret_cast<char *>(malloc(size + 1));
         memcpy(_sval, v, size);
         _sval[size] = '\0';
-        _isowner     = 1;
+        _isalloc     = 1;
     }
     _size  = size;
     _dtype = 3;
@@ -197,6 +197,8 @@ int32_t Value::to_i32() const
             return static_cast<int32_t>(_ival);
         case 3:
             return util::strto<int32_t>(c_str());
+        case 4:
+            return static_cast<int32_t>(_uval);
         default:
             break;
     }
@@ -211,6 +213,8 @@ uint32_t Value::to_u32() const
             return static_cast<uint32_t>(_ival);
         case 3:
             return util::strto<uint32_t>(c_str());
+        case 4:
+            return static_cast<uint32_t>(_uval);
         default:
             break;
     }
@@ -225,29 +229,33 @@ int64_t Value::to_long() const
             return _ival;
         case 3:
             return util::strto<int64_t>(c_str());
+        case 4:
+            return static_cast<int64_t>(_uval);
         default:
             break;
     }
     return 0;
 }
 
-/*
-int64_t Value::to_ulong() const
+
+uint64_t Value::to_ulong() const
 {
     switch (_dtype)
     {
     case 1:
         return static_cast<uint64_t>(_fval);
     case 2:
-        return _uval;
+        return static_cast<uint64_t>(_ival);
     case 3:
         return util::strto<uint64_t>(c_str());
+    case 4:
+        return _uval;
     default:
         break;
     }
     return 0;
 }
-*/
+
 
 double Value::to_double() const
 {
@@ -371,7 +379,7 @@ int Value::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         case TLV_LTYPE_ARRAY0: /* any type array, array_size + elem_type +
                                   elem_data[n] */
         {
-            if (dtype() != 101) {
+            if (dtype() != DataType::ARRAY) {
                 LOGE("bad dtype:%d for array", dtype());
                 return -1;
             }
@@ -383,8 +391,8 @@ int Value::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         } break;
         case TLV_LTYPE_OBJECT: /* object object_size + object_data */
         {
-            if (dtype() != 100) {
-                LOGE("bad dtype:%d for array", dtype());
+            if (dtype() != DataType::OBJECT) {
+                LOGE("bad dtype:%d for object", dtype());
                 return -1;
             }
             auto obj = as_object<TupleRecord>();
@@ -561,6 +569,9 @@ std::ostream &operator<<(std::ostream &oss, const Value &o)
             break;
         case 3:
             oss << o.c_str();
+            break;
+        case 4:
+            oss << o.to_ulong();
             break;
         default:
             break;

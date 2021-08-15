@@ -36,7 +36,7 @@ int CerebroBacktest::init(const CerebroConfig &conf)
     broker_->init(account_);
     // 入初始资金
     if(state_ == 0) {
-        broker->deposit_cash(conf.cash);
+        broker_->deposit_cash(conf.cash);
     }
 
     broker_->set_matcher("SH", new CerebroSSEMatcher(broker_));

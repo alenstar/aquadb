@@ -20,6 +20,8 @@ limitations under the License.
 #include "logger_wrapper.h"
 
 #include "libnuraft/nuraft.hxx"
+#include "db/db.h"
+#include "db/raft_log_store.h"
 
 #include "service_impl.h"
 
@@ -32,20 +34,56 @@ limitations under the License.
 
 DEFINE_int32(server_id, 1, "server id");
 DEFINE_int32(datacenter_id, 1, "datacenter id");
-DEFINE_string(listen,"0.0.0.0:9999", "http service listen address");
+DEFINE_string(http,"0.0.0.0:9999", "http service listen address");
 DEFINE_string(endpoint,"127.0.0.1:9900", "raft endpoint");
+DEFINE_string(dbpath,"raft_data", "raft database path");
 
 int init_raft(GlobalContext* ctx) {
     // Logger.
     std::string log_file_name = "./srv" +
                                 std::to_string( ctx->server_id_ ) +
                                 ".log";
+
+    // uuid 
+    ctx->order_id_gen_.init(ctx->server_id_, FLAGS_datacenter_id);
+    ctx->trader_id_gen_.init(ctx->server_id_, FLAGS_datacenter_id);
+
+    // aquadb
+    ctx->db_mgr_ = aquadb::DBManager::get_instance();
+    int rc = ctx->db_mgr_->init(FLAGS_dbpath);
+    if(rc != 0)
+    {
+        LOGE("DBManager init %s fail, code=%d", FLAGS_dbpath.c_str(), rc);
+        return -1;
+    }
+    rc = ctx->db_mgr_->open("db_raft", true);
+    if(rc != 0)
+    {
+        LOGE("DBManager open db_raft fail, code=%d", rc);
+        return rc;
+    }
+    //rc = ctx->db_mgr_->create_kv_table("db_raft","raft_log", aquadb::FieldDescriptor::FieldType::UInt64);
+    //if(rc != 0)
+    //{
+    //    LOGE("DBManager create raft_log table fail, code=%d", rc);
+    //    return rc;
+    //}
+    rc = ctx->db_mgr_->create_kv_table("db_raft","raft_config");
+    if(rc != 0)
+    {
+        LOGE("DBManager create raft_config table fail, code=%d", rc);
+        return rc;
+    }
+    // raft log store
+    ctx->raft_log_store_ = std::make_shared<aquadb::RaftLogStore>(aquadb::RocksWrapper::get_instance());
+
+
     nuraft::ptr<logger_wrapper> log_wrap = nuraft::cs_new<logger_wrapper>( log_file_name, 4 );
     ctx->raft_logger_ = log_wrap;
 
     // State machine.
     ctx->smgr_ = nuraft::cs_new<nuraft::rocksdb_state_mgr>( ctx->server_id_,
-                                           ctx->endpoint_ );
+                                           ctx->endpoint_, ctx);
     // State manager.
     ctx->sm_ = nuraft::cs_new<nuraft::rocksdb_state_machine>(); 
 
@@ -53,10 +91,6 @@ int init_raft(GlobalContext* ctx) {
     nuraft::asio_service::options asio_opt;
     asio_opt.thread_pool_size_ = 4;
 
-
-    // uuid 
-    ctx->order_id_gen.init(ctx->server_id_, FLAGS_datacenter_id);
-    ctx->trader_id_gen.init(ctx->server_id_, FLAGS_datacenter_id);
 
     // Raft parameters.
     nuraft::raft_params params;
@@ -98,7 +132,7 @@ int init_raft(GlobalContext* ctx) {
 
     // Wait until Raft server is ready (upto 5 seconds).
     const size_t MAX_TRY = 20;
-    std::cout << "init Raft instance ";
+    LOGI("init Raft instance ");
     for (size_t ii=0; ii<MAX_TRY; ++ii) {
         if (ctx->raft_instance_->is_initialized()) {
             std::cout << " done" << std::endl;
@@ -109,7 +143,7 @@ int init_raft(GlobalContext* ctx) {
         //TestSuite::sleep_ms(250);
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
-    std::cout << " FAILED" << std::endl;
+    LOGE("raft instance initialized FAILED");
     log_wrap.reset();
     //exit(-1);
     return -1;
@@ -140,7 +174,7 @@ int main(int argc, char** argv) {
     std::cout << "                         Version 0.1.0" << std::endl;
     std::cout << "    Server ID:    " << ctx.server_id_ << std::endl;
     std::cout << "    Endpoint:     " << ctx.addr_ << ":" << ctx.port_ << std::endl;
-    std::cout << "    Server listen:     " << FLAGS_listen << std::endl;
+    std::cout << "    Server http:     " << FLAGS_http << std::endl;
     int rc = init_raft( &ctx );
     if(rc != 0)
     {
@@ -151,7 +185,7 @@ int main(int argc, char** argv) {
     //loop();
     // TODO
     // wait for shutdown
-    impl.Listen(FLAGS_listen);
+    impl.Listen(FLAGS_http);
     for(;;){
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

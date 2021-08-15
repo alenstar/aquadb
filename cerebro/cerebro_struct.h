@@ -216,7 +216,7 @@ class CerebroOrder
     // 冻结价格
     double frozen_price = 0;
     // 消息 (下单是填充)
-    std::string message;
+    std::string msg;
     // 原因 (撮合时，系统填充, 用于描述未成交原因)
     std::string reason;
     // 合约
@@ -268,6 +268,8 @@ class CerebroOrder
       js["type"] = type;
       js["trading_date"] = trading_date;
       js["transaction_cost"] = transaction_cost;
+      js["reason"] = reason;
+      js["msg"] = msg;
       return js;
     }
     std::string to_json_string() const {

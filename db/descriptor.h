@@ -154,7 +154,11 @@ class FieldDescriptor
         Int8 = 6,
         FixedString = 7,
         String = 8,
-        DateTime = 9
+        DateTime = 9,
+        UInt64 = 11,
+        UInt32 = 12,
+        UInt16 = 13,
+        UInt8 = 14
     };
 
     std::string name;    // 1 字段名
@@ -186,6 +190,9 @@ class FieldDescriptor
             break;
         case FieldType::Int64:
             oss << "Int64";
+            break;
+        case FieldType::UInt64:
+            oss << "UInt64";
             break;
         case FieldType::Int32:
             oss << "Int32";
@@ -632,11 +639,17 @@ class DatabaseDescriptor
         }
         return nullptr;
     }
-    void add_table(const std::string& name, TableDescriptorPtr p) {
+    inline void add_table(const std::string& name, TableDescriptorPtr p) {
         _name2table[name] = p;
     }
+    inline void remove_table(const std::string& name) {
+        _name2table.erase(name);
+    }
 
-    uint32_t next_id() { return (++last_tid);}
+    inline uint32_t next_id() { return (++last_tid);}
+    inline uint32_t last_table_id() const { return last_tid;}
+
+    size_t table_nums() const  {return _name2table.size();}
     private:
     std::map<std::string, TableDescriptorPtr> _name2table;
 };
@@ -660,6 +673,9 @@ inline int field_append_value(const FieldDescriptor *field, const Value *v, MutT
         case FieldDescriptor::FieldType::Int64:
             key.append_i64(static_cast<int64_t>(v->to_long()));
             break;
+        case FieldDescriptor::FieldType::UInt64:
+            key.append_u64(static_cast<uint64_t>(v->to_ulong()));
+            break;
         case FieldDescriptor::FieldType::Float32:
             key.append_float(static_cast<float>(v->to_double()));
             break;
@@ -674,6 +690,7 @@ inline int field_append_value(const FieldDescriptor *field, const Value *v, MutT
 
         case FieldDescriptor::FieldType::String:
             // not support
+            key.append_string(v->c_str(), v->size());
             break;
 
         default:

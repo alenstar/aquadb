@@ -1,3 +1,4 @@
+#include <exception>
 #include "service_impl.h"
 #include "db/db.h"
 #include "nlohmann/json.hpp"
@@ -8,6 +9,12 @@
 #define GET_STATE_MACHINE(x) (static_cast<nuraft::rocksdb_state_machine *>(x->sm_.get()))
 
 using raft_result = nuraft::cmd_result<nuraft::ptr<nuraft::buffer>>;
+
+    std::shared_ptr<aquadb::TableOperator> GlobalContext::get_raft_config_tbl()
+    {
+        return db_mgr_->get_table_writer("db_raft", "raft_config");
+    }
+
 
 int HttpServiceImpl::Init(GlobalContext *ctx)
 {
@@ -32,7 +39,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
     });
 
     svr_.set_logger([](const httplib::Request &req, const httplib::Response &res)->void{
-        LOGI("path=%s", req.path.c_str());
+        LOGI("%s path:%s, status:%d, reason:%s", req.method.c_str(), req.path.c_str(), res.status, res.reason.c_str());
     });
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -81,8 +88,8 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
 
     svr_.Post("/raft/addserver", [this](const httplib::Request &req, httplib::Response &res) {
         nlohmann::json js = nlohmann::json::parse(req.body);
-        std::string out;
         int rc = AddServer(js.at("server_id").get<int>(), js.at("endpoint").get<std::string>());
+        js.clear();
         js["ret_code"] = rc;
         if (rc != 0)
         {
@@ -90,7 +97,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         }
         else
         {
-            //    js["data"] = out.to_json();
+            js["data"] = nullptr;
         }
         res.set_content(js.dump(), "application/json");
     });
@@ -376,7 +383,7 @@ int HttpServiceImpl::AddServer(int server_id, const std::string &endpoint)
 
     if (!server_id || server_id == ctx_->server_id_)
     {
-        std::cout << "wrong server id: " << server_id << std::endl;
+        LOGE("wrong server id: %d, %s", server_id, endpoint.c_str());
         return -1;
     }
 
@@ -384,10 +391,10 @@ int HttpServiceImpl::AddServer(int server_id, const std::string &endpoint)
     nuraft::ptr<raft_result> ret = ctx_->raft_instance_->add_srv(srv_conf_to_add);
     if (!ret->get_accepted())
     {
-        std::cout << "failed to add server: " << ret->get_result_code() << std::endl;
+        LOGE("failed to add server, code: %d %s, id: %d %s", ret->get_result_code(), ret->get_result_str().c_str(),server_id, endpoint.c_str());
         return -1;
     }
-    std::cout << "async request is in progress (check with `serverlist` command)" << std::endl;
+    LOGI("async request is in progress (check with `serverlist` command)");
 
     return 0;
 }
@@ -396,18 +403,17 @@ int HttpServiceImpl::RemoveServer(int server_id)
 {
     if (server_id < 1 ||  server_id == ctx_->server_id_)
     {
-        std::cout << "wrong server id: " << server_id << std::endl;
+        LOGE("wrong server id: %d", server_id);
         return -1;
     }
 
     nuraft::ptr<raft_result> ret = ctx_->raft_instance_->remove_srv(server_id);
     if (!ret->get_accepted())
     {
-        std::cout << "failed to add server: " << ret->get_result_code() << std::endl;
+        LOGE("failed to remove server, code: %d %s, id: %d", ret->get_result_code(), ret->get_result_str().c_str(),server_id);
         return -1;
     }
-    std::cout << "async request is in progress (check with `serverlist` command)" << std::endl;
-
+    LOGI("async request is in progress (check with `serverlist` command)");
     return 0;
 }
 
@@ -454,11 +460,11 @@ int HttpServiceImpl::RemoveServer(int server_id)
             return trader;
         }while(0);
 
-        auto id = ctx_->trader_id_gen.nextid();
+        auto id = ctx_->trader_id_gen_.nextid();
         auto trader = std::make_shared<CerebroTrader>();
         // 必先初始化前设置order_id_generator
         trader->get_broker()->set_order_id_generator([this]()->int64_t{
-            return ctx_->order_id_gen.nextid();
+            return ctx_->order_id_gen_.nextid();
         });
         trader->init(id, name, cash);
 
@@ -473,6 +479,7 @@ int HttpServiceImpl::RemoveServer(int server_id)
         auto it = traders_.find(id);
         if(it == traders_.cend())
         {
+            LOGW("not found trader: %lu", id);
             return -1;
         }
         else 
@@ -490,6 +497,7 @@ int HttpServiceImpl::RemoveServer(int server_id)
         {
             return it->second;
         }
+        LOGW("not found trader: %lu", id);
         return nullptr;
     }
 
@@ -499,6 +507,7 @@ int HttpServiceImpl::RemoveServer(int server_id)
         auto nm = traders_nm_.find(name);
         if(nm == traders_nm_.cend())
         {
+            LOGW("not found trader, name: %s", name.c_str());
             return nullptr;
         }
 
@@ -507,6 +516,7 @@ int HttpServiceImpl::RemoveServer(int server_id)
         {
             return it->second;
         }
+        LOGW("not found trader, name: %s", name.c_str());
         return nullptr;
     }
 

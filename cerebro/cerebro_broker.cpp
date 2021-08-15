@@ -48,6 +48,9 @@ void CerebroPositionTracker::buy(double quantity, double price, double commissio
         _position.avg_price = price;
         _position.quantity = quantity;
         _position.commissions = commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
     else
     {
@@ -55,6 +58,9 @@ void CerebroPositionTracker::buy(double quantity, double price, double commissio
             (_position.avg_price * _position.quantity + quantity * price) / (_position.quantity + quantity);
         _position.quantity += quantity;
         _position.commissions += commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
 }
 void CerebroPositionTracker::sell(double quantity, double price, double commission)
@@ -67,6 +73,9 @@ void CerebroPositionTracker::sell(double quantity, double price, double commissi
         _position.avg_price = price;
         _position.quantity = quantity * (-1);
         _position.commissions = commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
     else
     {
@@ -74,6 +83,9 @@ void CerebroPositionTracker::sell(double quantity, double price, double commissi
             (_position.avg_price * _position.quantity - quantity * price) / (_position.quantity - quantity);
         _position.quantity -= quantity;
         _position.commissions += commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
 }
 
@@ -87,6 +99,9 @@ void CerebroPositionTracker::buy_to_cover(double quantity, double price, double 
         _position.avg_price = price;
         _position.quantity = quantity;
         _position.commissions = commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
     else
     {
@@ -94,6 +109,9 @@ void CerebroPositionTracker::buy_to_cover(double quantity, double price, double 
             (_position.avg_price * _position.quantity + quantity * price) / (_position.quantity + quantity);
         _position.quantity += quantity;
         _position.commissions += commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
 }
 void CerebroPositionTracker::sell_short(double quantity, double price, double commission)
@@ -106,6 +124,9 @@ void CerebroPositionTracker::sell_short(double quantity, double price, double co
         _position.avg_price = price;
         _position.quantity = quantity;
         _position.commissions = commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
     else
     {
@@ -113,6 +134,9 @@ void CerebroPositionTracker::sell_short(double quantity, double price, double co
             (_position.avg_price * _position.quantity + quantity * price) / (_position.quantity + quantity);
         _position.quantity += quantity;
         _position.commissions += commission;
+        if(_tplus == 0){
+            _position.closable += quantity;
+        }
     }
 }
 
@@ -147,8 +171,9 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
             if(util::almost_gt(tota_price, _broker->get_cash()))
             {
                 LOGW("invlaid order: Insufficient available funds, cash: %f, price: %f ,%s", _broker->get_cash(), tota_price, order.symbol.c_str());
+            order.status = ORDER_STATUS::REJECTED;
                 order.reason = " Insufficient available funds";
-                return -1;
+                return 0;
             }
 
             if (util::almost_lt(order.price, tick.last))
@@ -162,20 +187,20 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
             //order.filled_quantity = order.quantity;
             order.mtime = tick.ts;
             order.trading_date = tick.dt;
+            // 订单自带手续费时，不计算手续费 (子单自带手续费)
+            if(util::almost_eq(order.transaction_cost, 0.0)) {
             order.transaction_cost = _broker->calc_commission(order);
-
+            }
             order.status = ORDER_STATUS::FILLED;
-            _broker->current_account()->transform_cash_to_market_value(order.filled_price * order.filled_quantity, order.transaction_cost);
-            if (util::almost_nq(order.quantity, order.filled_quantity))
+
+            if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
                 order.unfilled_quantity = order.quantity - order.filled_quantity;
-                // 子单在broker中拆分
-                // 处理部分成交
-                // 母单extr字段中记录子单id
-                // TODO
-                // 等待下个行情
+                // 手续费分摊
+                order.transaction_cost = order.transaction_cost * (order.filled_quantity/order.quantity);
             }
+            _broker->current_account()->transform_cash_to_market_value(order.filled_price * order.filled_quantity, order.transaction_cost);
             return 0;
     }
     else if (order.action == ORDER_ACTION::SELL)
@@ -184,8 +209,9 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
         if(util::almost_gt(order.quantity, tracker->current_closable()))
         {
             LOGW("invlaid order,Can close the position insufficient: %s, closable:%f, order.quantity:%f", order.symbol.c_str(), tracker->current_closable(),order.quantity);
+            order.status = ORDER_STATUS::REJECTED;
             order.reason = "Can close the position insufficient";
-            return -1;
+            return 0;
         }
             if (util::almost_gt(order.price, tick.last))
             {
@@ -198,20 +224,19 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
             //order.filled_quantity = order.quantity;
             order.mtime = tick.ts;
             order.trading_date = tick.dt;
+            if(util::almost_eq(order.transaction_cost, 0.0)) {
             order.transaction_cost = _broker->calc_commission(order);
-
+            }
             order.status = ORDER_STATUS::FILLED;
-            _broker->current_account()->transform_market_value_to_cash(order.filled_price * order.filled_quantity, order.transaction_cost);
-            if (util::almost_nq(order.quantity, order.filled_quantity))
+
+            if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
                 order.unfilled_quantity = order.quantity - order.filled_quantity;
-                // 子单在broker中拆分
-                // 处理部分成交
-                // 母单extr字段中记录子单id
-                // TODO
-                // 等待下个行情
+                // 手续费分摊
+                order.transaction_cost = order.transaction_cost * (order.filled_quantity/order.quantity);
             }
+            _broker->current_account()->transform_market_value_to_cash(order.filled_price * order.filled_quantity, order.transaction_cost);
             return 0;
     }
     //else if (order.action == ORDER_ACTION::BUY_TO_COVER) {}
@@ -220,6 +245,8 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
     {
         // TODO
         LOGE("unknown order.action=%d", static_cast<int>(order.action));
+        order.status = ORDER_STATUS::REJECTED;
+        order.reason = "unknown order action";
     }
     return 0;
 }
@@ -231,8 +258,9 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
             if(util::almost_gt(tota_price, _broker->get_cash()))
             {
                 LOGW("invlaid order: Insufficient available funds, cash: %f, price: %f ,%s", _broker->get_cash(), tota_price, order.symbol.c_str());
+                order.status = ORDER_STATUS::REJECTED;
                 order.reason = " Insufficient available funds";
-                return -1;
+                return 0;
             }
 
             order.filled_price = tick.last + _broker->get_slippage();
@@ -240,44 +268,49 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
             //order.filled_quantity = order.quantity;
             order.mtime = tick.ts;
             order.trading_date = tick.dt;
+            if(util::almost_eq(order.transaction_cost, 0.0)) {
             order.transaction_cost = _broker->calc_commission(order);
+            }
             order.status = ORDER_STATUS::FILLED;
 
-            //_broker->add_cash(-(order.filled_price * order.filled_quantity), order.transaction_cost);
-            _broker->current_account()->transform_cash_to_market_value(order.filled_price * order.filled_quantity, order.transaction_cost);
-
-            if (util::almost_nq(order.quantity, order.filled_quantity))
+            if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
                 order.unfilled_quantity = order.quantity - order.filled_quantity;
+                // 手续费分摊
+                order.transaction_cost = order.transaction_cost * (order.filled_quantity/order.quantity);
             }
+            _broker->current_account()->transform_cash_to_market_value(order.filled_price * order.filled_quantity, order.transaction_cost);
             return 0;
     }
     else if (order.action == ORDER_ACTION::SELL)
     {
         auto tracker = _broker->get_long_tracker(order.symbol);
-                if(util::almost_gt(order.quantity, tracker->current_closable()))
+        if(util::almost_gt(order.quantity, tracker->current_closable()))
         {
             LOGW("invlaid order,Can close the position insufficient: %s, closable:%f, order.quantity:%f", order.symbol.c_str(), tracker->current_closable(),order.quantity);
+            order.status = ORDER_STATUS::REJECTED;
             order.reason = "Can close the position insufficient";
-            return -1;
+            return 0;
         }
-
             order.filled_price = tick.last + _broker->get_slippage();
             order.filled_quantity = std::min(tick.bid_vols.at(0), order.quantity);
             //order.filled_quantity = order.quantity;
             order.mtime = tick.ts;
             order.trading_date = tick.dt;
-            order.transaction_cost = _broker->calc_commission(order);
+            if(util::almost_eq(order.transaction_cost, 0.0)) {
+                order.transaction_cost = _broker->calc_commission(order);
+            }
             order.status = ORDER_STATUS::FILLED;
 
-            //_broker->add_cash(order.filled_price * order.filled_quantity, order.transaction_cost);
-            _broker->current_account()->transform_market_value_to_cash(order.filled_price * order.filled_quantity, order.transaction_cost);
-            if (util::almost_nq(order.quantity, order.filled_quantity))
+            if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
                 order.unfilled_quantity = order.quantity - order.filled_quantity;
+                // 手续费分摊
+                order.transaction_cost = order.transaction_cost * (order.filled_quantity/order.quantity);
             }
+            _broker->current_account()->transform_market_value_to_cash(order.filled_price * order.filled_quantity, order.transaction_cost);
             return 0;
     }
     //else if (order.action == ORDER_ACTION::BUY_TO_COVER) {}
@@ -286,8 +319,10 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
     {
         // TODO
         LOGE("unknown order.action=%d %s", static_cast<int>(order.action), order.symbol.c_str());
+        order.status = ORDER_STATUS::REJECTED;
+        order.reason = "unknown order action";
     }
-    return -1;
+    return 0;
 }
 int CerebroMatcher::process_order_amend(CerebroOrder &order, const CerebroTickRecord &tick)
 {
@@ -622,8 +657,9 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
     auto & unfill_orders = it->second;
     for (auto &o : unfill_orders)
     {
-        if (o.status == ORDER_STATUS::REJECTED || o.status == ORDER_STATUS::FILLED)
+        if (o.status == ORDER_STATUS::REJECTED || o.status == ORDER_STATUS::CANCELLED || o.status == ORDER_STATUS::FILLED)
         {
+            _filled_orders.push_back(o);
             continue;
         }
         std::string exchg;
@@ -636,7 +672,7 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
         {
             // TODO
             LOGE("matcher not found: %s, symbol=%s", exchg.c_str(), o.symbol.c_str());
-            return;
+            continue;
         }
         int rc = it->second->match(o, record);
         if (rc != 0)
@@ -644,13 +680,13 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
             // TODO
             // 处理撮合异常
             LOGE("matche fail, rc=%d, symbol=%s", rc, o.symbol.c_str());
-            return;
+            continue;
         }
 
         o.mtime = now_ms();
         // 通知订单更新
         on_order_update(o);
-        if(_order_update_callback){
+        if(_order_update_callback && o.status != ORDER_STATUS::PENDING_NEW){
             _order_update_callback(o);
         }
 
@@ -663,15 +699,9 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
             _filled_orders.push_back(o);
         }
 
-        if (util::almost_eq(o.unfilled_quantity, 0.0))
-        {
-            // 全成
-            // == 0  撮合完成(仅完全成交才返回0)，将订单从待撮合列表移除
-        }
-        else
+        if (util::almost_ne(o.unfilled_quantity, 0.0))
         {
             // 部成
-            // TODO
             CerebroOrder suborder;
             suborder.symbol = o.symbol;
             suborder.action = o.action;
@@ -682,7 +712,8 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
             suborder.price = o.price;
             suborder.quantity = o.unfilled_quantity;
             suborder.unfilled_quantity = 0.0;
-            suborder.transaction_cost = 0.0;
+            // 分摊手续费
+            suborder.transaction_cost = (o.transaction_cost/(o.filled_quantity/o.quantity)) * (1 - o.filled_quantity/o.quantity);
             suborder.trading_date = 0;
             suborder.reason.clear();
             suborder.ctime = now_ms(); // 创建时间
@@ -693,7 +724,8 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
         }
     }
     // 移除已成订单
-    unfill_orders.erase(std::remove_if(unfill_orders.begin(), unfill_orders.end(), [&oids](CerebroOrder& o){ return oids.find(o.order_id) != oids.cend();}), unfill_orders.end());
+    unfill_orders.erase(std::remove_if(unfill_orders.begin(), unfill_orders.end(), [](CerebroOrder& o){ 
+        return (o.status == ORDER_STATUS::REJECTED || o.status == ORDER_STATUS::CANCELLED || o.status == ORDER_STATUS::FILLED);}), unfill_orders.end());
     for(auto & o: neworders)
     {
         if(_order_update_callback){

@@ -32,15 +32,15 @@ class DBManager
         std::string s(basepath);
         return init(s);
     }
-    int open(const std::string &dbname, bool readonly = true);
-    int open(const char *dbname, bool readonly = true)
+    int open(const std::string &dbname, bool auto_create = false);
+    int open(const char *dbname, bool auto_create = false)
     {
         std::string s(dbname);
-        return open(s, readonly);
+        return open(s, auto_create);
     }
     int create(const std::string &dbname);
-    int create_kv_table(const std::string &dbname, const std::string &tblname);
-    int create_table(const std::string &dbname, TableDescriptorPtr& descriptor, bool if_not_exists = false);
+    int create_kv_table(const std::string &dbname, const std::string &tblname, FieldDescriptor::FieldType key_type = FieldDescriptor::FieldType::String, bool if_not_exists = true);
+    int create_table(const std::string &dbname, TableDescriptorPtr& descriptor, bool if_not_exists = true);
     int close(const std::string &dbname);
     int close(const char *dbname)
     {
@@ -52,7 +52,7 @@ class DBManager
     bool drop(const std::string &dbname);
 
     TableReaderPtr get_table_reader(const std::string &dbname, const std::string &tblname);
-    TableWriterPtr get_table_writer(const std::string &dbname, const std::string &tblname);
+    TableOperatorPtr get_table_writer(const std::string &dbname, const std::string &tblname);
     TableDescriptorPtr get_table_descriptor(const std::string &dbname, const std::string &tblname);
 
   private:

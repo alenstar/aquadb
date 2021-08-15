@@ -173,6 +173,7 @@ class Value
 
     void set_value(const std::string &v);
     void set_value(const char *v, size_t size);
+    void set_ref(const char *v, size_t size);
 
     int32_t to_i32() const;
     uint32_t to_u32() const;
@@ -185,7 +186,7 @@ class Value
      * @return int64_t
      */
     int64_t to_long() const;
-    // int64_t to_ulong() const;
+    uint64_t to_ulong() const;
 
     /**
      * @brief 获取浮点值, 自动类型转换
@@ -268,6 +269,7 @@ class Value
      * @return false
      */
     bool is_long() const;
+    bool is_ulong() const;
 
     /**
      * @brief 是否字符串
@@ -298,24 +300,25 @@ class Value
         char _buffer[sizeof(int64_t)];
         double _fval;
         int64_t _ival;
-        // uint64_t _uval;
+        uint64_t _uval;
         char *_sval;
     };
     char _padding[sizeof(int32_t)]; // padding
     uint32_t _size : 24;            // string size range in [0, 2^24 - 1]
-    uint32_t _dtype : 7;   // 0 null, 1 double, 2 int64, 3 string, 100 tlv_object, 101 tlv_array; ragne in [0,127]
-    uint32_t _isowner : 1; // the string is copy, need free
+    uint32_t _dtype : 6;   // 0 null, 1 double, 2 int64, 3 string, 100 tlv_object, 101 tlv_array; ragne in [0,127]
+    uint32_t _isalloc : 1; // the string is alloc, need free
+    uint32_t _inlocal : 1; // the string in local stack, 
 };
 
 inline void Value::clear()
 {
-    if (_isowner)
+    if (_isalloc)
     {
         free(_sval);
     }
     _size = 0;
     _dtype = 0;
-    _isowner = 0;
+    _isalloc = 0;
     _sval = nullptr;
 }
 
@@ -346,7 +349,6 @@ inline uint8_t Value::wrie_type() const
         }
         return TLV_LTYPE_FLOAT64;
     case 2:
-        // case 4:
         if (_ival == 0)
         {
             return TLV_LTYPE_FALSE; //
@@ -366,6 +368,20 @@ inline uint8_t Value::wrie_type() const
         return TLV_LTYPE_VARINT_NEG; // -int
     case 3:
         return TLV_LTYPE_BYTES;
+    case 4:
+        if (_uval == 0)
+        {
+            return TLV_LTYPE_FALSE; //
+        }
+        else if (_uval == 1)
+        {
+            return TLV_LTYPE_TRUE; //
+        }
+        else
+        {
+            return TLV_LTYPE_VARINT_POS; // +int
+        }
+        return TLV_LTYPE_VARINT_NEG; // -int
     case DataType::OBJECT:
         return TLV_LTYPE_OBJECT; // object
     case DataType::ARRAY:
@@ -377,7 +393,7 @@ inline uint8_t Value::wrie_type() const
 
 inline const char *Value::c_str() const
 {
-    if (_isowner)
+    if (_isalloc)
     {
         return _sval;
     }
@@ -426,9 +442,8 @@ inline void Value::set_value(int64_t v)
 inline void Value::set_value(uint64_t v)
 {
     clear();
-    _dtype = 2;
-    //_uval = v;
-    _ival = static_cast<int64_t>(v);
+    _dtype = 4;
+    _uval = v;
 }
 
 inline void Value::set_value(uint32_t v)
@@ -445,11 +460,22 @@ inline void Value::set_ptr(void *ptr, uint8_t type)
     _sval = reinterpret_cast<char *>(ptr);
 }
 
+inline void Value::set_ref(const char* s, size_t size)
+{
+    clear();
+    _dtype = 3;
+    _isalloc = 0;
+    _sval = const_cast<char *>(s);
+    _size = static_cast<uint32_t>(size);
+}
+
+
 inline bool Value::is_none() const { return _dtype == 0; }
 
 inline bool Value::is_double() const { return _dtype == 1; }
 
 inline bool Value::is_long() const { return _dtype == 2; }
+inline bool Value::is_ulong() const { return _dtype == 4; }
 
 inline bool Value::is_string() const { return _dtype == 3; }
 
@@ -464,6 +490,10 @@ inline bool operator<(const Value &left, const Value &right)
         else if (left.is_long())
         {
             return left.to_long() < right.to_long();
+        }
+        else if (left.is_ulong())
+        {
+            return left.to_ulong() < right.to_ulong();
         }
         else
         {
@@ -485,6 +515,10 @@ inline bool operator>(const Value &left, const Value &right)
         {
             return left.to_long() > right.to_long();
         }
+        else if (left.is_ulong())
+        {
+            return left.to_ulong() > right.to_ulong();
+        }
         else
         {
             return ::strcmp(left.c_str(), right.c_str()) > 0;
@@ -505,6 +539,10 @@ inline bool operator==(const Value &left, const Value &right)
         {
             return left.to_long() == right.to_long();
         }
+        else if (left.is_ulong())
+        {
+            return left.to_ulong() == right.to_ulong();
+        }
         else
         {
             return ::strcmp(left.c_str(), right.c_str()) == 0;
@@ -524,6 +562,10 @@ inline bool operator!=(const Value &left, const Value &right)
         else if (left.is_long())
         {
             return left.to_long() != right.to_long();
+        }
+        else if (left.is_ulong())
+        {
+            return left.to_ulong() != right.to_ulong();
         }
         else
         {

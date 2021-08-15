@@ -163,14 +163,10 @@ inline absl::Time FromDateInt(int dt, bool utc=false)
 */
 
 template<typename T>
-bool almost_eq(T x, T y, int ulp = 6)
+bool almost_eq(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return std::fabs(x-y) <= std::numeric_limits<T>::epsilon() * std::fabs(x+y) * ulp
-        // unless the result is subnormal
-        || std::fabs(x-y) < std::numeric_limits<T>::min();
+    return std::fabs(x-y) <= (epsilon * 0.5);
     }
     else {
         return x == y;
@@ -178,30 +174,10 @@ bool almost_eq(T x, T y, int ulp = 6)
 }
 
 template<typename T>
-bool almost_nq(T x, T y, int ulp = 6)
+bool almost_ne(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return !(std::fabs(x-y) <= std::numeric_limits<T>::epsilon() * std::fabs(x+y) * ulp
-        // unless the result is subnormal
-        || std::fabs(x-y) < std::numeric_limits<T>::min());
-    }
-    else {
-        return x != y;
-    }
-}
-
-
-template<typename T>
-bool almost_ne(T x, T y, int ulp = 6)
-{
-    if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return !(std::fabs(x-y) <= std::numeric_limits<T>::epsilon() * std::fabs(x+y) * ulp
-        // unless the result is subnormal
-        || std::fabs(x-y) < std::numeric_limits<T>::min());
+    return !almost_eq(x,y,epsilon);
     }
     else {
         return x != y;
@@ -209,24 +185,20 @@ bool almost_ne(T x, T y, int ulp = 6)
 }
 
 template<typename T>
-bool almost_lt(T x, T y, int ulp = 6)
+bool almost_lt(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return  (x < y) && (std::fabs(x-y) < std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp);
+    return  (x < y) && (almost_ne(x,y,epsilon));
     }
     else {
         return x < y;
     }
 }
 template<typename T>
-bool almost_le(T x, T y, int ulp = 6)
+bool almost_le(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return  (x <= y) || almost_eq(x, y, ulp);
+    return  (x <= y) || almost_eq(x, y, epsilon);
     }
     else {
         return x <= y;
@@ -234,22 +206,20 @@ bool almost_le(T x, T y, int ulp = 6)
 }
 
 template<typename T>
-bool almost_gt(T x, T y, int ulp = 6)
+bool almost_gt(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return  (x > y) && (std::fabs(x-y) < std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp);
+    return  (x > y) && (almost_ne(x,y,epsilon));
     }
     else {
         return x > y;
     }
 }
 template<typename T>
-bool almost_ge(T x, T y, int ulp = 6)
+bool almost_ge(T x, T y, double epsilon = 0.000001)
 {
     if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
-    return  (x >= y) || almost_eq(x, y, ulp);
+    return  (x >= y) || almost_eq(x, y, epsilon);
     }
     else {
         return x >= y;

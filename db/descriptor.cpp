@@ -10,12 +10,16 @@ inline int field_fixed_size(const FieldDescriptor *field) {
     auto type = field->type; 
     switch (type) {
         case FieldDescriptor::FieldType::Int8:
+        case FieldDescriptor::FieldType::UInt8:
         return 1;
         case FieldDescriptor::FieldType::Int16:
+        case FieldDescriptor::FieldType::UInt16:
         return 2;
         case FieldDescriptor::FieldType::Int32:
+        case FieldDescriptor::FieldType::UInt32:
         return 4;
         case FieldDescriptor::FieldType::Int64:
+        case FieldDescriptor::FieldType::UInt64:
         return 8;
         case FieldDescriptor::FieldType::Float32:
         return 4;

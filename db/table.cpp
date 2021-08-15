@@ -5,7 +5,7 @@
 namespace aquadb
 {
 
-int TableWriter::insert(const std::vector<Value> &row)
+int TableOperator::put(const Value &key, const Value &val)
 {
     // build key
     MutTableKey mutkey;
@@ -13,22 +13,14 @@ int TableWriter::insert(const std::vector<Value> &row)
     mutkey.append_u32(_tbl->id);
     auto pk = _tbl->get_primary_key();
     size_t pk_num = pk->fields.size();
-    for (size_t i = 0; i < pk_num; ++i)
-    {
-        field_append_value(&(_tbl->fields.at(pk->fields.at(i))), &(row.at(i)), mutkey);
-    }
+    field_append_value(&(_tbl->fields.at(pk->fields.at(0))), &key, mutkey);
     rocksdb::Slice k(mutkey.data(), mutkey.size());
 
     // build value
     TupleRecord trecord;
-    size_t pos = 0;
-    for (auto it : _tbl->fields)
-    {
-        // TODO
-        // check type
-        trecord.insert(it.first, row.at(pos));
-        pos++;
-    }
+    trecord.insert(1, key);
+    trecord.insert(2, val);
+
     BufferArray ba;
     trecord.serialize(ba());
     rocksdb::Slice v(reinterpret_cast<const char *>(ba.data()), ba.size());
@@ -49,29 +41,220 @@ int TableWriter::insert(const std::vector<Value> &row)
     return ERR_WRITE_ABNORMALITY;
 }
 
-int TableWriter::insert(const TupleRecord &record)
+int TableOperator::get(const Value &key, Value &val)
 {
-    // build key
+    auto pk = _tbl->get_primary_key();
+
     MutTableKey mutkey;
     mutkey.append_u32(_db->id);
     mutkey.append_u32(_tbl->id);
-    auto pk = _tbl->get_primary_key();
-    //size_t pk_num = pk->fields.size();
-    for (auto i : pk->fields)
+    field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
+
+    auto ptr = RocksWrapper::get_instance();
+    rocksdb::Slice k(mutkey.data(), mutkey.size());
+    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+
+    if (!cursor->Valid())
     {
-        field_append_value(&(_tbl->fields.at(i)), record.get(i), mutkey);
+        // error
+        _errmsg = "Data iterator invalid";
+        return ERR_INVALID_PARAMS;
     }
+
+    auto v = cursor->value();
+    BufferView buf(v.data(), v.size());
+    TupleRecord trecord;
+    trecord.deserialize(buf);
+
+    if (trecord.has(2))
+    {
+        //  one field
+        val = trecord.at(2);
+        return 0;
+    }
+    return ERR_NOT_FOUND;
+}
+
+int TableOperator::scan_range(const Value& start_key, const Value& end_key, std::function<bool(const TableRow& v)> fn)
+{
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+
+    // build start key
+    MutTableKey stkey = build_table_key(start_key);
+    rocksdb::Slice stk(stkey.data(), stkey.size());
+
+    // build end key
+    MutTableKey edkey = build_table_key(end_key);
+    rocksdb::Slice edk(edkey.data(), edkey.size());
+
+    TableRow row;
+    // store
+    auto ptr = RocksWrapper::get_instance();
+    auto handle = ptr->get_data_handle();
+    rocksdb::Slice k(stkey.data(), stkey.size());
+    rocksdb::Slice endk(edkey.data(), edkey.size());
+    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+    for (;;)
+    {
+        if (!cursor->Valid())
+        {
+            continue;
+        }
+        auto k = cursor->key();
+        if (k.compare(edk) > 0)
+        {
+            break;
+        }
+        row.clear();
+        auto v = cursor->value();
+
+        Value val(v.data(), v.size());
+        Value key(k.data(), k.size());
+
+        // TODO
+        if(!fn(row))
+        {
+            break;
+        }
+        cursor->Next();
+    }
+
+    return 0;
+}
+
+
+int TableOperator::scan_prefix(const Value& prefix, std::function<bool(const TableRow& row)> fn)
+{
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+
+    // build start key
+    MutTableKey stkey = build_table_key(prefix);
+    rocksdb::Slice stk(stkey.data(), stkey.size());
+
+    auto ptr = RocksWrapper::get_instance();
+    auto handle = ptr->get_data_handle();
+    rocksdb::Slice k(stkey.data(), stkey.size());
+    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, true);
+
+    TableRow row;
+    for (;;)
+    {
+        if (!cursor->Valid())
+        {
+            continue;
+        }
+        row.clear();
+
+        auto k = cursor->key();
+        auto v = cursor->value();
+
+        // TODO
+        if(!fn(row))
+        {
+            break;
+        }
+        cursor->Next();
+    }
+
+    return 0;
+}
+
+
+int TableOperator::get_first(TableRow& record)
+{
+    auto pk = _tbl->get_primary_key();
+
+    MutTableKey mutkey;
+    mutkey.append_u32(_db->id);
+    mutkey.append_u32(_tbl->id);
+    //field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
+
+    auto ptr = RocksWrapper::get_instance();
+    rocksdb::Slice k(mutkey.data(), mutkey.size());
+    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+
+    if (!cursor->Valid())
+    {
+        // error
+        _errmsg = "Data iterator invalid";
+        return ERR_INVALID_PARAMS;
+    }
+
+    auto v = cursor->value();
+    BufferView buf(v.data(), v.size());
+    TupleRecord trecord;
+    trecord.deserialize(buf);
+
+        if (trecord.has(1))
+    {
+        auto val = trecord.at(1);
+        record.append("k", val);
+    }
+
+    if (trecord.has(2))
+    {
+        auto val = trecord.at(2);
+        record.append("v", val);
+    }
+
+    return 0;
+}
+int TableOperator::get_last(TableRow& record) { 
+    auto pk = _tbl->get_primary_key();
+
+    MutTableKey mutkey;
+    mutkey.append_u32(_db->id);
+    mutkey.append_u32(_tbl->id);
+    //field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
+
+    auto ptr = RocksWrapper::get_instance();
+    rocksdb::Slice k(mutkey.data(), mutkey.size());
+    auto cursor = ptr->seek_for_prev(ptr->get_data_handle(), k, false);
+
+    if (!cursor->Valid())
+    {
+        // error
+        _errmsg = "Data iterator invalid";
+        return ERR_INVALID_PARAMS;
+    }
+
+    auto v = cursor->value();
+    BufferView buf(v.data(), v.size());
+    TupleRecord trecord;
+    trecord.deserialize(buf);
+
+        if (trecord.has(1))
+    {
+        auto val = trecord.at(1);
+        record.append("k", val);
+    }
+
+    if (trecord.has(2))
+    {
+        auto val = trecord.at(2);
+        record.append("v", val);
+    }
+
+    return 0; 
+    }
+
+
+int TableOperator::insert(const TableRow &record)
+{
+    // build key
+    MutTableKey mutkey = build_table_key(record);
     rocksdb::Slice k(mutkey.data(), mutkey.size());
 
     // build value
-    //size_t pos = 0;
+    // size_t pos = 0;
     for (auto it : _tbl->fields)
     {
         // TODO
         // check type
     }
-    BufferArray ba;
-    record.serialize(ba());
+    BufferArray ba = build_table_value(record);
     rocksdb::Slice v(reinterpret_cast<const char *>(ba.data()), ba.size());
 
     // store
@@ -90,36 +273,27 @@ int TableWriter::insert(const TupleRecord &record)
     return ERR_WRITE_ABNORMALITY;
 }
 
-int TableWriter::insert(const std::vector<TupleRecord> &records)
+int TableOperator::insert(const TableRowSet &records)
 {
-        auto ptr = RocksWrapper::get_instance();
+    auto ptr = RocksWrapper::get_instance();
     auto handle = ptr->get_data_handle();
+    auto num = records.rows_num();
     rocksdb::WriteBatch wbat;
-    for (auto const &record : records)
+    for (size_t i = 0; i < num; ++i)
     {
         // build key
-        MutTableKey mutkey;
-        mutkey.append_u32(_db->id);
-        mutkey.append_u32(_tbl->id);
-        auto pk = _tbl->get_primary_key();
-        //size_t pk_num = pk->fields.size();
-        for (auto i : pk->fields)
-        {
-            field_append_value(&(_tbl->fields.at(i)), record.get(i), mutkey);
-        }
+        MutTableKey mutkey = build_table_key(records, static_cast<int>(i));
         rocksdb::Slice k(mutkey.data(), mutkey.size());
 
         // build value
-        //size_t pos = 0;
+        // size_t pos = 0;
         for (auto it : _tbl->fields)
         {
             // TODO
             // check type
         }
-        BufferArray ba;
-        record.serialize(ba());
+        BufferArray ba = build_table_value(records, static_cast<int>(i));
         rocksdb::Slice v(reinterpret_cast<const char *>(ba.data()), ba.size());
-
         wbat.Put(handle, k, v);
     }
 
@@ -137,18 +311,10 @@ int TableWriter::insert(const std::vector<TupleRecord> &records)
     return ERR_WRITE_ABNORMALITY;
 }
 
-int TableWriter::remove(const std::vector<Value> &row)
+int TableOperator::remove(const Value &key)
 {
     // build key
-    MutTableKey mutkey;
-    mutkey.append_u32(_db->id);
-    mutkey.append_u32(_tbl->id);
-    auto pk = _tbl->get_primary_key();
-    size_t pk_num = pk->fields.size();
-    for (size_t i = 0; i < pk_num; ++i)
-    {
-        field_append_value(&(_tbl->fields.at(pk->fields.at(i))), &(row.at(i)), mutkey);
-    }
+    MutTableKey mutkey = build_table_key(key);
     rocksdb::Slice k(mutkey.data(), mutkey.size());
 
     // store
@@ -167,29 +333,23 @@ int TableWriter::remove(const std::vector<Value> &row)
     return ERR_WRITE_ABNORMALITY;
 }
 
-int TableWriter::remove_range(const std::vector<Value> &start_key, const std::vector<Value> &end_key)
+int TableOperator::remove_range(const Value &start_key, const Value &end_key)
 {
     auto pk = _tbl->get_primary_key();
     size_t pk_num = pk->fields.size();
 
     // build start key
-    MutTableKey stkey;
+    MutTableKey stkey = build_table_key(start_key);
     stkey.append_u32(_db->id);
     stkey.append_u32(_tbl->id);
-    for (size_t i = 0; i < pk_num; ++i)
-    {
-        field_append_value(&(_tbl->fields.at(pk->fields.at(i))), &(start_key.at(i)), stkey);
-    }
+    field_append_value(&(_tbl->fields.at(pk->fields.at(0))), &start_key, stkey);
     rocksdb::Slice stk(stkey.data(), stkey.size());
 
     // build end key
-    MutTableKey edkey;
+    MutTableKey edkey = build_table_key(end_key);
     edkey.append_u32(_db->id);
     edkey.append_u32(_tbl->id);
-    for (size_t i = 0; i < pk_num; ++i)
-    {
-        field_append_value(&(_tbl->fields.at(pk->fields.at(i))), &(end_key.at(i)), edkey);
-    }
+    field_append_value(&(_tbl->fields.at(pk->fields.at(0))), &end_key, edkey);
     rocksdb::Slice edk(edkey.data(), edkey.size());
 
     // store
@@ -207,6 +367,117 @@ int TableWriter::remove_range(const std::vector<Value> &start_key, const std::ve
     }
     return ERR_WRITE_ABNORMALITY;
 }
+
+int TableOperator::remove(const std::vector<Value> &row)
+{
+    // build key
+    std::vector<MutTableKey> keys;
+    for(auto const& v: row)
+    {
+        keys.emplace_back(build_table_key(v));
+    }
+
+    // store
+    auto ptr = RocksWrapper::get_instance();
+    auto handle = ptr->get_data_handle();
+    rocksdb::WriteOptions wopt;
+    rocksdb::WriteBatch batch;
+    for(auto& v: keys)
+    {
+    rocksdb::Slice k(v.data(), v.size());
+        batch.Delete(handle, k);
+    }
+    auto status = ptr->write(wopt, &batch);
+    if (status.ok())
+    {
+        return 0;
+    }
+    else
+    {
+        _errmsg = status.ToString();
+    }
+    return ERR_WRITE_ABNORMALITY;
+}
+
+
+    MutTableKey TableOperator::build_table_key(const Value& value)
+    {
+    // build start key
+    MutTableKey key;
+    key.append_u32(_db->id);
+    key.append_u32(_tbl->id);
+    //key.append_string(value.data(), key.size());
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+    field_append_value(&(_tbl->fields.at(pk->fields.at(0))), &value, key);
+    return key;
+    }
+    MutTableKey TableOperator::build_table_key_raw(const Value& value)
+    {
+    // build start key
+    MutTableKey key;
+    key.append_u32(_db->id);
+    key.append_u32(_tbl->id);
+    key.append_string(value.data(), key.size());
+    return key;
+    }
+
+
+    MutTableKey TableOperator::build_table_key(const std::vector<Value>& values)
+    {
+    // build start key
+    MutTableKey key;
+    key.append_u32(_db->id);
+    key.append_u32(_tbl->id);
+
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+    for (size_t i = 0; i < pk_num; ++i)
+    {
+        field_append_value(&(_tbl->fields.at(pk->fields.at(i))), &(values.at(i)), key);
+    }
+    return key;
+    }
+
+
+    MutTableKey TableOperator::build_table_key(const TableRow& row) 
+    {
+    // build start key
+    MutTableKey key;
+    key.append_u32(_db->id);
+    key.append_u32(_tbl->id);
+    // TODO
+
+return key;
+    }
+    MutTableKey TableOperator::build_table_key(const TableRowSet& rows, int idx)
+    {
+    // build start key
+    MutTableKey key;
+    key.append_u32(_db->id);
+    key.append_u32(_tbl->id);
+    // TODO
+
+    return key;
+    }
+
+
+
+    BufferArray TableOperator::build_table_value(const TableRow& row)
+    {
+        BufferArray ba;
+
+        return ba;
+    }
+
+    BufferArray TableOperator::build_table_value(const TableRowSet& rows, int idx)
+    {
+        BufferArray ba;
+
+        return ba;
+    }
+//////////////////////////////////////////////////////////////////////////////
+
 
 int TableReader::seek_to_first(const IndexDescriptor *index, const std::vector<Value> &key)
 {
@@ -405,8 +676,7 @@ int TableReader::prev()
     return 0;
 }
 
-
-int TableReader::get(const std::vector<Value>& pk, TupleRecord& record)
+int TableReader::get(const std::vector<Value> &pk, TupleRecord &record)
 {
     if (pk.size() != _tbl->get_primary_key()->fields.size())
     {
@@ -441,37 +711,37 @@ int TableReader::get(const std::vector<Value>& pk, TupleRecord& record)
 
     return 0;
 }
-int TableReader::get(const std::vector<Value>& pk, std::vector<Value>& row)
+int TableReader::get(const std::vector<Value> &pk, std::vector<Value> &row)
 {
     TupleRecord record;
     int rc = get(pk, record);
-    if(rc != 0)
+    if (rc != 0)
     {
         return rc;
     }
     // TODO
     for (auto it : _tbl->fields)
     {
-            if (record.has(it.first))
-            {
-                row.emplace_back(std::move(record.at(it.first)));
-            }
-            else
-            {
-                // TODO for default value
-                Value v;
-                field_default_value(&(it.second), &v);
-                row.emplace_back(std::move(v));
-            }
+        if (record.has(it.first))
+        {
+            row.emplace_back(std::move(record.at(it.first)));
         }
+        else
+        {
+            // TODO for default value
+            Value v;
+            field_default_value(&(it.second), &v);
+            row.emplace_back(std::move(v));
+        }
+    }
     return rc;
 }
 
-int TableReader::get(const Value& key, Value& val)
+int TableReader::get(const Value &key, Value &val)
 {
     auto pk = _tbl->get_primary_key();
     int rc = seek_to(pk, {key});
-    if(rc != 0)
+    if (rc != 0)
     {
         return rc;
     }
@@ -483,28 +753,25 @@ int TableReader::get(const Value& key, Value& val)
         return ERR_INVALID_PARAMS;
     }
 
-        auto v = _iter->value();
-        BufferView buf(v.data(), v.size());
-        TupleRecord trecord;
-        trecord.deserialize(buf);
+    auto v = _iter->value();
+    BufferView buf(v.data(), v.size());
+    TupleRecord trecord;
+    trecord.deserialize(buf);
 
-        for (auto it : _tbl->fields)
+    for (auto it : _tbl->fields)
+    {
+        if (it.second.flags & static_cast<uint16_t>(FieldDescriptor::FieldFlag::PrimaryKey))
         {
-            if(it.second.flags & static_cast<uint16_t>(FieldDescriptor::FieldFlag::PrimaryKey))
-            {
-                continue;
-            }
-            if (trecord.has(it.first))
-            {
-                //  one field
-                val = trecord.at(it.first);
-                return 0;
-            }
+            continue;
         }
+        if (trecord.has(it.first))
+        {
+            //  one field
+            val = trecord.at(it.first);
+            return 0;
+        }
+    }
 
     return -1;
 }
-
-
-
 }

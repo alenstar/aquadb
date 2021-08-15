@@ -22,7 +22,7 @@ set(LIB_BASE_SRC tuple_value.cpp varint.c mut_table_key.cpp table_key.cpp tuple_
 
 #add_subdirectory(src)
 
-set(LIB_SRC db.cpp table.cpp)
+set(LIB_SRC db.cpp table.cpp raft_log_store.cpp)
 
 add_library(${LIB_NAME} ${LIB_BASE_SRC} ${LIB_SRC} ${LIB_INC})
 add_dependencies(${LIB_NAME} util)

@@ -26,10 +26,10 @@ namespace nuraft {
 class rocksdb_state_mgr: public state_mgr {
 public:
     rocksdb_state_mgr(int srv_id,
-                    const std::string& endpoint)
+                    const std::string& endpoint, GlobalContext* ctx)
         : my_id_(srv_id)
         , my_endpoint_(endpoint)
-        , cur_log_store_( cs_new<rocksdb_log_store>() )
+        , cur_log_store_( cs_new<rocksdb_log_store>(ctx) )
     {
         my_srv_config_ = cs_new<srv_config>( srv_id, endpoint );
 

@@ -52,7 +52,10 @@ int main(int argc ,char* argv[])
 
     aquadb::Value k("hello");
     aquadb::Value v("world!");
-    rc = writer->insert({k,v});
+    aquadb::TableRow row;
+    row.append("k", k);
+    row.append("v", v);
+    rc = writer->insert(row);
     if(rc != 0)
     {
         LOGE("insert record failed: %d", rc);

@@ -45,20 +45,41 @@ int DBManager::init(const std::string &basepath)
 }
 
 
-int DBManager::open(const std::string &dbname, bool readonly)
+int DBManager::open(const std::string &dbname, bool auto_create)
 {
-    auto it = _name2dbi.find(dbname);
-    if(it == _name2dbi.cend())
+    auto it = get_db_descriptor(dbname);
+    if(it == nullptr)
     {
         // TODO
         // not found db
-        return ERR_DB_NOT_FOUND;
+        if(auto_create)
+        {
+            int rc = create(dbname);
+            if(rc != 0)
+            {
+                LOGE("create %s fail,code=%d", dbname.c_str(), rc);
+                return rc;
+            }
+            it =  get_db_descriptor(dbname);
+            if(it == nullptr)
+            {
+                return ERR_DB_NOT_FOUND;
+            }
+        }
+        else {
+            return ERR_DB_NOT_FOUND;
+        }
+    }
+
+    if(it->last_table_id() != 0 && it->table_nums() != 0)
+    {
+        return 0;
     }
     
     auto ptr = RocksWrapper::get_instance();
     MutTableKey key;
     key.append_u32(kMetaTableId);
-    key.append_u32(it->second->id);
+    key.append_u32(it->id);
     rocksdb::Slice k(key.data(), key.size());
     auto cursor = ptr->seek_for_next(ptr->get_meta_info_handle(), k, true);
     for (; cursor->Valid(); cursor->Next())
@@ -72,7 +93,7 @@ int DBManager::open(const std::string &dbname, bool readonly)
         auto v = cursor->value();
         BufferView buf(v.data(), v.size());
         tbdesc->deserialize(buf);
-        it->second->add_table(tbdesc->name, tbdesc);
+        it->add_table(tbdesc->name, tbdesc);
     }
     return 0;
 }
@@ -125,7 +146,7 @@ int DBManager::create(const std::string& dbname)
     return status.code();
 }
 
-int DBManager::create_kv_table(const std::string& dbname, const std::string& tblname)
+int DBManager::create_kv_table(const std::string& dbname, const std::string& tblname, FieldDescriptor::FieldType key_type, bool if_not_exists)
 {
     auto db = get_db_descriptor(dbname);
     if(!db)
@@ -136,7 +157,7 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     if(db->exists(tblname))
     {
         // TODO
-        return 0;
+        return if_not_exists ? ERR_OK : ERR_ALREADY_EXISTS;
     }
 
     // build table metadata
@@ -148,8 +169,10 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     kfield.name = "k";
     kfield.id = tbl->next_id();
     kfield.flags = static_cast<uint16_t>(FieldDescriptor::FieldFlag::PrimaryKey);
-    kfield.type = FieldDescriptor::FieldType::FixedString;
+    kfield.type = key_type;
+    if (key_type == FieldDescriptor::FieldType::FixedString) {
     kfield.len = 120; // max key size
+    }
     // build val field
     FieldDescriptor vfield;
     vfield.name = "v";
@@ -278,7 +301,7 @@ int DBManager::close_all() { return -1; }
     auto reader = std::make_shared<TableReader>(db, tbl);
     return reader;
  }
- TableWriterPtr DBManager::get_table_writer(const std::string &dbname, const std::string &tblname){
+ TableOperatorPtr DBManager::get_table_writer(const std::string &dbname, const std::string &tblname){
      auto db = get_db_descriptor(dbname);
      if(!db)
      {
@@ -289,7 +312,7 @@ int DBManager::close_all() { return -1; }
      {
          return nullptr;
      }
-    auto writer = std::make_shared<TableWriter>(db, tbl);
+    auto writer = std::make_shared<TableOperator>(db, tbl);
     return writer;
  }
 

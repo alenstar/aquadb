@@ -424,7 +424,8 @@ class CerebroBroker
         {
             return it->second;
         }
-        auto p = new CerebroPositionTracker(symbol, POSITION_DIRECTION::LONG);
+        // 默认使用 t+1
+        auto p = new CerebroPositionTracker(symbol, POSITION_DIRECTION::LONG, 1);
         _lpositions.insert(std::make_pair(symbol, p));
         return p;
     }
