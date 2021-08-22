@@ -570,13 +570,13 @@ int create_position_table(aquadb::DBManager* mgr, const std::string& dbname, con
     return rc;
 }
 
-int aquadb_record_to_tick(const aquadb::TupleRecord& record, CerebroTickRecord& tick)
+int aquadb_record_to_tick(const aquadb::TupleObject& record, CerebroTickRecord& tick)
 {
     // TODO
     return -1;
 }
 
-int tick_to_aquadb_record(const  CerebroTickRecord& tick,aquadb::TupleRecord& record)
+int tick_to_aquadb_record(const  CerebroTickRecord& tick,aquadb::TupleObject& record)
 {
     return 0;
 }

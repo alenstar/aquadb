@@ -16,6 +16,10 @@ nlohmann::json CerebroBacktest::to_json() const
     }
     return js;
 }
+  // void CerebroBacktest::set_quote_provider(std::shared_ptr<CerebroQuoteProvider> provider) {
+  //    qprovider_ = provider;
+  //  }
+
 
 int CerebroBacktest::init(const CerebroConfig &conf)
 {
@@ -25,7 +29,7 @@ int CerebroBacktest::init(const CerebroConfig &conf)
         for (auto &st : strategys_) {
             // FIXME
             // 可根据订单中的扩展字段找到对于的下单策略
-            st.second->on_order_update(&o);
+            st.second->on_order_update(broker_, &o);
         }
     });
     last_order_id_ = 1000000;
@@ -48,7 +52,7 @@ int CerebroBacktest::run()
     CerebroKlineRecord kline;
     std::unordered_map<Symbol, CerebroTickRecordPtr> quotes;
     CerebroQuotePlayer player;
-    player.init(conf_.qtype);
+    player.init(conf_.qtype, nullptr);
 
     for (int dt = conf_.start_date; dt <= conf_.end_date; ++dt) {
         // TODO
@@ -80,7 +84,7 @@ int CerebroBacktest::run()
                 }
             }
 
-            // 可用考虑多线程执行
+            // 可考虑多线程执行
             broker_->on_tick(*quote);
         }
 
@@ -90,7 +94,13 @@ int CerebroBacktest::run()
         }
 
         // 盘后结算
-        broker_->settle();
+        std::vector<CerebroKlineRecord> records;
+        rc = player.get_daily_kline(dt, records);
+        if(rc != 0) {
+            LOGE("get daily kline fail, dt=%d",dt);
+        } else {
+            broker_->settle(records);
+        }
         //收盘后
         for (auto &st : strategys_) {
             st.second->on_aft_market_close(broker_, dt);

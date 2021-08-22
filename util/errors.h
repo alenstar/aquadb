@@ -5,7 +5,7 @@
 
 namespace util {
 
-enum ErrorNo : int {
+enum Errors : int {
     ENO_SUCC = 0,
     // 1 --- 1000 保留为系统错误码
     ENO_FAIL          = 1001,

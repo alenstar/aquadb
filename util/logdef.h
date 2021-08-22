@@ -1,7 +1,6 @@
 #pragma once
 
-//#include <butil/logging.h>
-//#include <easyloggingpp/easylogging++.h>
+#include <easyloggingpp/easylogging++.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,17 +26,23 @@
 #endif
 
 #define MY_LOG_TYPE 1
-
+// #ifdef __cplusplus
+/**
+ * TAG 必须使用  SPDLOG_INITEX(tag) 来注册一次,不然会段错误
+ * 默认使用debug级别的日志
+ * 默认使用多线程支持
+ * 默认使用stdout输出日志
+ * */
 #ifndef SPDLOG_TAG
 #define SPDLOG_TAG "default"
 #endif
 
-//#define LOG_DEBUG( X ) do{LOG( DEBUG ) << X ;}while(0)
-//#define LOG_INFO( X ) do{LOG( INFO ) << X ;} while(0)
-//#define LOG_NOTICE( X ) do{LOG( NOTICE ) << X ; }while(0)
-//#define LOG_WARN( X ) do{LOG( WARNING ) << X ; }while(0)
-//#define LOG_ERROR( X ) do{LOG( ERROR ) << X ; } while(0)
-//#define LOG_FATA( X ) do{LOG( FATA ) << X ;}while(0)
+#define LOG_DEBUG( X ) do{LOG( DEBUG ) << X ;}while(0)
+#define LOG_INFO( X ) do{LOG( INFO ) << X ;} while(0)
+#define LOG_NOTICE( X ) do{LOG( NOTICE ) << X ; }while(0)
+#define LOG_WARN( X ) do{LOG( WARNING ) << X ; }while(0)
+#define LOG_ERROR( X ) do{LOG( ERROR ) << X ; } while(0)
+#define LOG_FATA( X ) do{LOG( FATA ) << X ;}while(0)
 
 #if MY_LOG_TYPE == 1 // def DEBUG
 #define LOGD( ... )                                                                                                    \

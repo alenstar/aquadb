@@ -13,6 +13,7 @@
 #include "util/mutex.h"
 
 #include "cerebro_struct.h"
+#include "cerebro_recorder.h"
 
 
 namespace mdlink_api {
@@ -51,11 +52,11 @@ namespace mdlink_api {
         std::string url_;
     };
 
-    class MarketDataProvider
+    class MarketDataProvider: public CerebroQuoteProvider
     {
         public:
         MarketDataProvider() = default;
-        ~MarketDataProvider() = default;
+        ~MarketDataProvider() override {}
 
         int init(int size, const std::string& api_name = "sina");
         int update_codes();
@@ -66,35 +67,7 @@ namespace mdlink_api {
             codes_ = std::move(codes);
         }
 
-        bool on_quote(MarketQuotePtr quote)
-        {
-                        // TODO
-            if (!std::isnormal(quote->last))
-            {
-                // 无效行情
-                LOGW("invlaid tick: last price invalid, %f, %s", quote->last, quote->symbol.c_str());
-                return true;
-            }
-            {
-                util::RWMutex::WriteLock lck(quotes_mtx_);
-                auto it = quotes_.find(quote->symbol);
-                if(it == quotes_.end())
-                {
-                    quotes_[quote->symbol] = quote;
-                }
-                else {
-                    if(quote->ts <= it->second->ts)
-                    {
-                        // 剔除旧行情
-                        return true;
-                    }
-                }
-            }
-            if(quotes_callback_) {
-                return quotes_callback_(quote);
-            }
-            return true;
-        }
+        bool on_quote(MarketQuotePtr quote);
         void set_quotes_callback(std::function<bool(MarketQuotePtr)> fn)
         {
             quotes_callback_ = fn;
@@ -102,8 +75,8 @@ namespace mdlink_api {
 
         void clear()
         {
-                util::RWMutex::WriteLock lck(quotes_mtx_);
-                quotes_.clear();
+            util::RWMutex::WriteLock lck(quotes_mtx_);
+            quotes_.clear();
         }
 
         void wait_for_shutdown()
@@ -116,6 +89,11 @@ namespace mdlink_api {
             std::vector<std::string> codes = codes_;
             return codes;
             }
+
+        int get_daily_kline(int dt, std::vector<CerebroKlineRecord>& records) override;
+        int get_daily_kline_by_range(const Symbol& symbol, int start_dt, int end_dt, std::vector<CerebroKlineRecord>& records) override;
+        int get_daily_kline_by_num(const Symbol& symbol, int end_dt, int num, std::vector<CerebroKlineRecord>& records) override;
+        int get_minute_kline(const Symbol& symbol, int dt, int span, std::vector<CerebroKlineRecord>& records) override;
         protected:
             MdLinkApiPtr get_mdlink_api();
 

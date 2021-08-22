@@ -335,4 +335,52 @@ int MarketDataProvider::update_quotes(const std::string& code)
     return 0;
 }
 
+
+        bool MarketDataProvider::on_quote(MarketQuotePtr quote)
+        {
+                        // TODO
+            if (!std::isnormal(quote->last))
+            {
+                // 无效行情
+                LOGW("invlaid tick: last price invalid, %f, %s", quote->last, quote->symbol.c_str());
+                return true;
+            }
+            {
+                util::RWMutex::WriteLock lck(quotes_mtx_);
+                auto it = quotes_.find(quote->symbol);
+                if(it == quotes_.end())
+                {
+                    quotes_[quote->symbol] = quote;
+                }
+                else {
+                    if(quote->ts <= it->second->ts)
+                    {
+                        // 剔除旧行情
+                        return true;
+                    }
+                }
+            }
+            if(quotes_callback_) {
+                return quotes_callback_(quote);
+            }
+            return true;
+        }
+
+
+        int MarketDataProvider::get_daily_kline(int dt, std::vector<CerebroKlineRecord>& records)
+        {
+            return -1;
+        }
+        int MarketDataProvider::get_daily_kline_by_range(const Symbol& symbol, int start_dt, int end_dt, std::vector<CerebroKlineRecord>& records)
+        {
+            return -1;
+        }
+        int MarketDataProvider::get_daily_kline_by_num(const Symbol& symbol, int end_dt, int num, std::vector<CerebroKlineRecord>& records)
+        {
+            return -1;
+        }
+        int MarketDataProvider::get_minute_kline(const Symbol& symbol, int dt, int span, std::vector<CerebroKlineRecord>& records)
+        {
+            return -1;
+        }
 }

@@ -650,7 +650,7 @@ struct CerebroConfig
   int64_t strategyid; // 策略ID，一个策略一个账户ID，（后续可以支持一个策略用不同账户ID来下单）, 一个账户ID可以在多个策略中使用
   double cash = 1000000;// 初始资金， 金回测用
   double comm_rate = 0.0003; //手续费
-  double slippage = 1.0; // 滑点
+  int slippage = 1.0; // 滑点
 
   std::vector<Symbol> symbols; // 关注的标的,  回放行情时使用
   int start_date; // 回测起始日期
@@ -690,7 +690,8 @@ class CerebroDataFeed
 class CerebroStrategy
 {
   public:
-    virtual ~CerebroStrategy() {}
+  CerebroStrategy() = default;
+    virtual ~CerebroStrategy();
     virtual void on_market_open(CerebroBroker* broker, int dt) = 0;
     virtual void on_pre_market_open(CerebroBroker* broker, int dt) = 0;
     virtual void on_market_close(CerebroBroker* broker, int dt) = 0;
@@ -699,7 +700,7 @@ class CerebroStrategy
     virtual void on_tick(CerebroBroker* broker, CerebroTickRecord* tick) = 0;  // 加载tick缓存， 触发用户业务回调on_tick，再触发broker撮合
     virtual void on_kline(CerebroBroker* broker, CerebroKlineRecord* kline) = 0; // 根据时间点加载k线缓存，再处理用户业务回调on_kline
     // virtual void on_market_quote_data() = 0; // 市场行情数据, 所有行情数据tick,minute,daily都先经过此函数再到on_tick,on_kline
-    virtual void on_order_update(const CerebroOrder* order);
+    virtual void on_order_update(CerebroBroker* broker,const CerebroOrder* order) = 0;
 
     const std::string& name() const { return name_;}
     protected:
