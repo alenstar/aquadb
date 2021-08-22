@@ -17,7 +17,7 @@ int TableOperator::put(const Value &key, const Value &val)
     rocksdb::Slice k(mutkey.data(), mutkey.size());
 
     // build value
-    TupleRecord trecord;
+    TupleObject trecord;
     trecord.insert(1, key);
     trecord.insert(2, val);
 
@@ -26,10 +26,9 @@ int TableOperator::put(const Value &key, const Value &val)
     rocksdb::Slice v(reinterpret_cast<const char *>(ba.data()), ba.size());
 
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     rocksdb::WriteOptions wopt;
-    auto status = ptr->put(wopt, handle, k, v);
+    auto status = _wrapper->put(wopt, handle, k, v);
     if (status.ok())
     {
         return 0;
@@ -50,9 +49,8 @@ int TableOperator::get(const Value &key, Value &val)
     mutkey.append_u32(_tbl->id);
     field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, false);
 
     if (!cursor->Valid())
     {
@@ -63,7 +61,7 @@ int TableOperator::get(const Value &key, Value &val)
 
     auto v = cursor->value();
     BufferView buf(v.data(), v.size());
-    TupleRecord trecord;
+    TupleObject trecord;
     trecord.deserialize(buf);
 
     if (trecord.has(2))
@@ -90,11 +88,9 @@ int TableOperator::scan_range(const Value& start_key, const Value& end_key, std:
 
     TableRow row;
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
     rocksdb::Slice k(stkey.data(), stkey.size());
     rocksdb::Slice endk(edkey.data(), edkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, false);
     for (;;)
     {
         if (!cursor->Valid())
@@ -133,10 +129,8 @@ int TableOperator::scan_prefix(const Value& prefix, std::function<bool(const Tab
     MutTableKey stkey = build_table_key(prefix);
     rocksdb::Slice stk(stkey.data(), stkey.size());
 
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
     rocksdb::Slice k(stkey.data(), stkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, true);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, true);
 
     TableRow row;
     for (;;)
@@ -171,9 +165,8 @@ int TableOperator::get_first(TableRow& record)
     mutkey.append_u32(_tbl->id);
     //field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, false);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, false);
 
     if (!cursor->Valid())
     {
@@ -184,7 +177,7 @@ int TableOperator::get_first(TableRow& record)
 
     auto v = cursor->value();
     BufferView buf(v.data(), v.size());
-    TupleRecord trecord;
+    TupleObject trecord;
     trecord.deserialize(buf);
 
         if (trecord.has(1))
@@ -209,9 +202,8 @@ int TableOperator::get_last(TableRow& record) {
     mutkey.append_u32(_tbl->id);
     //field_append_value(_tbl->get_field_descriptor(pk->fields.at(0)), &key, mutkey);
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_prev(ptr->get_data_handle(), k, false);
+    auto cursor = _wrapper->seek_for_prev(_wrapper->get_data_handle(), k, false);
 
     if (!cursor->Valid())
     {
@@ -222,7 +214,7 @@ int TableOperator::get_last(TableRow& record) {
 
     auto v = cursor->value();
     BufferView buf(v.data(), v.size());
-    TupleRecord trecord;
+    TupleObject trecord;
     trecord.deserialize(buf);
 
         if (trecord.has(1))
@@ -258,10 +250,9 @@ int TableOperator::insert(const TableRow &record)
     rocksdb::Slice v(reinterpret_cast<const char *>(ba.data()), ba.size());
 
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     rocksdb::WriteOptions wopt;
-    auto status = ptr->put(wopt, handle, k, v);
+    auto status = _wrapper->put(wopt, handle, k, v);
     if (status.ok())
     {
         return 0;
@@ -275,8 +266,7 @@ int TableOperator::insert(const TableRow &record)
 
 int TableOperator::insert(const TableRowSet &records)
 {
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     auto num = records.rows_num();
     rocksdb::WriteBatch wbat;
     for (size_t i = 0; i < num; ++i)
@@ -299,7 +289,7 @@ int TableOperator::insert(const TableRowSet &records)
 
     // store
     rocksdb::WriteOptions wopt;
-    auto status = ptr->write(wopt, &wbat);
+    auto status = _wrapper->write(wopt, &wbat);
     if (status.ok())
     {
         return 0;
@@ -318,10 +308,9 @@ int TableOperator::remove(const Value &key)
     rocksdb::Slice k(mutkey.data(), mutkey.size());
 
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     rocksdb::WriteOptions wopt;
-    auto status = ptr->remove(wopt, handle, k);
+    auto status = _wrapper->remove(wopt, handle, k);
     if (status.ok())
     {
         return 0;
@@ -353,10 +342,9 @@ int TableOperator::remove_range(const Value &start_key, const Value &end_key)
     rocksdb::Slice edk(edkey.data(), edkey.size());
 
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     rocksdb::WriteOptions wopt;
-    auto status = ptr->remove_range(wopt, handle, stk, edk, false);
+    auto status = _wrapper->remove_range(wopt, handle, stk, edk, false);
     if (status.ok())
     {
         return 0;
@@ -378,8 +366,7 @@ int TableOperator::remove(const std::vector<Value> &row)
     }
 
     // store
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_data_handle();
+    auto handle = _wrapper->get_data_handle();
     rocksdb::WriteOptions wopt;
     rocksdb::WriteBatch batch;
     for(auto& v: keys)
@@ -387,7 +374,7 @@ int TableOperator::remove(const std::vector<Value> &row)
     rocksdb::Slice k(v.data(), v.size());
         batch.Delete(handle, k);
     }
-    auto status = ptr->write(wopt, &batch);
+    auto status = _wrapper->write(wopt, &batch);
     if (status.ok())
     {
         return 0;
@@ -447,17 +434,32 @@ int TableOperator::remove(const std::vector<Value> &row)
     key.append_u32(_db->id);
     key.append_u32(_tbl->id);
     // TODO
-
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+    for (size_t i = 0; i < pk_num; ++i)
+    {
+        auto const& field = _tbl->fields.at(pk->fields.at(i));
+        auto val = row.value(field.name);
+        field_append_value(&field, &val, key);
+    }
 return key;
     }
-    MutTableKey TableOperator::build_table_key(const TableRowSet& rows, int idx)
+    MutTableKey TableOperator::build_table_key(const TableRowSet& rows, size_t rowid)
     {
     // build start key
     MutTableKey key;
+
     key.append_u32(_db->id);
     key.append_u32(_tbl->id);
     // TODO
-
+    auto pk = _tbl->get_primary_key();
+    size_t pk_num = pk->fields.size();
+    for (size_t i = 0; i < pk_num; ++i)
+    {
+        auto const& field = _tbl->fields.at(pk->fields.at(i));
+        auto val = rows.value(rowid,field.name);
+        field_append_value(&field, &val, key);
+    }
     return key;
     }
 
@@ -466,15 +468,33 @@ return key;
     BufferArray TableOperator::build_table_value(const TableRow& row)
     {
         BufferArray ba;
+        TupleBuffer buffer;
+        size_t size = row.size();
+        for(size_t i = 0;i < size; ++i)
+        {
+            auto const& name = row.name(i);
+            auto field = _tbl->get_field_descriptor(name);
+            buffer.append(field->id, row.value(i));
+        }
 
+        ba = std::move(buffer());
         return ba;
     }
 
-    BufferArray TableOperator::build_table_value(const TableRowSet& rows, int idx)
+    BufferArray TableOperator::build_table_value(const TableRowSet& rows, size_t rowid)
     {
         BufferArray ba;
+        TupleBuffer buffer;
+        size_t size = rows.rows_num();
+        for(size_t i = 0;i < size; ++i)
+        {
+            auto const& name = rows.name(i);
+            auto field = _tbl->get_field_descriptor(name);
+            buffer.append(field->id, rows.value(rowid,i));
+        }
 
-        return ba;
+        ba = std::move(buffer());
+        return ba;;
     }
 //////////////////////////////////////////////////////////////////////////////
 
@@ -496,9 +516,8 @@ int TableReader::seek_to_first(const IndexDescriptor *index, const std::vector<V
         field_append_value(_tbl->get_field_descriptor(index->fields.at(i)), &(key.at(i)), mutkey);
     }
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, true);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, true);
     _iter = std::move(cursor);
     _mutkey = std::move(mutkey);
 
@@ -524,9 +543,8 @@ int TableReader::seek_to_last(const IndexDescriptor *index, const std::vector<Va
         field_append_value(_tbl->get_field_descriptor(index->fields.at(i)), &(key.at(i)), mutkey);
     }
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_prev(ptr->get_data_handle(), k, true);
+    auto cursor = _wrapper->seek_for_prev(_wrapper->get_data_handle(), k, true);
     _iter = std::move(cursor);
     _mutkey = std::move(mutkey);
 
@@ -552,9 +570,8 @@ int TableReader::seek_to(const IndexDescriptor *index, const std::vector<Value> 
         field_append_value(_tbl->get_field_descriptor(index->fields.at(i)), &(key.at(i)), mutkey);
     }
 
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
-    auto cursor = ptr->seek_for_next(ptr->get_data_handle(), k, prefix);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_data_handle(), k, prefix);
     _iter = std::move(cursor);
     _mutkey = std::move(mutkey);
 
@@ -591,7 +608,7 @@ int TableReader::next()
         TableDescriptorPtr tbdesc = std::make_shared<TableDescriptor>();
         auto v = _iter->value();
         BufferView buf(v.data(), v.size());
-        TupleRecord trecord;
+        TupleObject trecord;
         trecord.deserialize(buf);
 
         bool firstdo = (_names.size() == 0);
@@ -676,7 +693,7 @@ int TableReader::prev()
     return 0;
 }
 
-int TableReader::get(const std::vector<Value> &pk, TupleRecord &record)
+int TableReader::get(const std::vector<Value> &pk, TupleObject &record)
 {
     if (pk.size() != _tbl->get_primary_key()->fields.size())
     {
@@ -694,10 +711,9 @@ int TableReader::get(const std::vector<Value> &pk, TupleRecord &record)
     }
 
     std::string value;
-    auto ptr = RocksWrapper::get_instance();
     rocksdb::Slice k(mutkey.data(), mutkey.size());
     rocksdb::ReadOptions ropt;
-    auto status = ptr->get(ropt, ptr->get_data_handle(), k, &value);
+    auto status = _wrapper->get(ropt, _wrapper->get_data_handle(), k, &value);
     if (!status.ok())
     {
         // error
@@ -713,7 +729,7 @@ int TableReader::get(const std::vector<Value> &pk, TupleRecord &record)
 }
 int TableReader::get(const std::vector<Value> &pk, std::vector<Value> &row)
 {
-    TupleRecord record;
+    TupleObject record;
     int rc = get(pk, record);
     if (rc != 0)
     {
@@ -755,7 +771,7 @@ int TableReader::get(const Value &key, Value &val)
 
     auto v = _iter->value();
     BufferView buf(v.data(), v.size());
-    TupleRecord trecord;
+    TupleObject trecord;
     trecord.deserialize(buf);
 
     for (auto it : _tbl->fields)

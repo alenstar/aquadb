@@ -87,9 +87,13 @@ class MyListener : public rocksdb::EventListener {
         DB_WARNING("OnStallConditionsChanged, cf:%s is_stall:%d", info.cf_name.c_str(), is_stall);
     }
     virtual void OnFlushCompleted(rocksdb::DB* /*db*/, const rocksdb::FlushJobInfo& info) {
-        RocksWrapper::get_instance()->set_flush_file_number(info.cf_name, info.file_number);
+        //RocksWrapper::get_instance()->set_flush_file_number(info.cf_name, info.file_number);
         DB_WARNING("OnFlushCompleted, cf:%s file_number:%lu", info.cf_name.c_str(), info.file_number);
     }
+    public:
+    MyListener(RocksWrapper* wrapper):wrapper_(wrapper) {}
+    private:
+    RocksWrapper* wrapper_;
 };
 
 
@@ -112,7 +116,7 @@ int32_t RocksWrapper::init(const std::string& path) {
     if (_is_init) {
         return 0;
     }
-    std::shared_ptr<rocksdb::EventListener> my_listener = std::make_shared<MyListener>();
+    std::shared_ptr<rocksdb::EventListener> my_listener = std::make_shared<MyListener>(this);
     rocksdb::BlockBasedTableOptions table_options;
     if (FLAGS_rocks_use_partitioned_index_filters) {
         // use Partitioned Index Filters

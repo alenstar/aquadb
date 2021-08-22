@@ -6,15 +6,20 @@
 namespace aquadb
 {
 
+DBManager::DBManager()
+{
+    _wrapper = new RocksWrapper();
+}
+
 DBManager::~DBManager()
 {
+    delete _wrapper;
 }
 
 int DBManager::init(const std::string &basepath)
 {
     _basepath = basepath;
-    auto ptr = RocksWrapper::get_instance();
-    int rc=  ptr->init(basepath);
+    int rc=  _wrapper->init(basepath);
     if(rc != 0)
     {
         LOGE("rocksdb wrapper init failed: %s", basepath.c_str());
@@ -24,7 +29,7 @@ int DBManager::init(const std::string &basepath)
     MutTableKey key;
     key.append_u32(kMetaDatabaseId);
     rocksdb::Slice k(key.data(), key.size());
-    auto cursor = ptr->seek_for_next(ptr->get_meta_info_handle(), k, true);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_meta_info_handle(), k, true);
     for (; cursor->Valid(); cursor->Next())
     {
         if (!cursor->key().starts_with(k))
@@ -76,12 +81,11 @@ int DBManager::open(const std::string &dbname, bool auto_create)
         return 0;
     }
     
-    auto ptr = RocksWrapper::get_instance();
     MutTableKey key;
     key.append_u32(kMetaTableId);
     key.append_u32(it->id);
     rocksdb::Slice k(key.data(), key.size());
-    auto cursor = ptr->seek_for_next(ptr->get_meta_info_handle(), k, true);
+    auto cursor = _wrapper->seek_for_next(_wrapper->get_meta_info_handle(), k, true);
     for (; cursor->Valid(); cursor->Next())
     {
         if (!cursor->key().starts_with(k))
@@ -118,8 +122,7 @@ int DBManager::create(const std::string& dbname)
     rocksdb::Slice key(k.data(), k.size());
     rocksdb::Slice val(reinterpret_cast<const char*>(v.data()), v.size());
 
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_meta_info_handle();
+    auto handle = _wrapper->get_meta_info_handle();
     
     /*
     auto txndb = ptr->get_db();
@@ -132,7 +135,7 @@ int DBManager::create(const std::string& dbname)
     */
 
     rocksdb::WriteOptions wopt;
-    auto status = ptr->put(wopt, handle, key, val);
+    auto status = _wrapper->put(wopt, handle, key, val);
     if(!status.ok())
     {
         LOGE("put error: %s", status.getState());
@@ -190,8 +193,7 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     rocksdb::Slice key(k.data(), k.size());
     rocksdb::Slice val(reinterpret_cast<const char*>(v.data()), v.size());
 
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_meta_info_handle();
+    auto handle = _wrapper->get_meta_info_handle();
     
     /*
     auto txndb = ptr->get_db();
@@ -204,7 +206,7 @@ int DBManager::create_kv_table(const std::string& dbname, const std::string& tbl
     */
 
     rocksdb::WriteOptions wopt;
-    auto status = ptr->put(wopt, handle, key, val);
+    auto status = _wrapper->put(wopt, handle, key, val);
     if(!status.ok())
     {
         LOGE("put error: %s", status.getState());
@@ -244,8 +246,7 @@ int DBManager::create_table(const std::string &dbname, aquadb::TableDescriptorPt
     rocksdb::Slice key(k.data(), k.size());
     rocksdb::Slice val(reinterpret_cast<const char*>(v.data()), v.size());
 
-    auto ptr = RocksWrapper::get_instance();
-    auto handle = ptr->get_meta_info_handle();
+    auto handle = _wrapper->get_meta_info_handle();
     
     /*
     auto txndb = ptr->get_db();
@@ -258,7 +259,7 @@ int DBManager::create_table(const std::string &dbname, aquadb::TableDescriptorPt
     */
 
     rocksdb::WriteOptions wopt;
-    auto status = ptr->put(wopt, handle, key, val);
+    auto status = _wrapper->put(wopt, handle, key, val);
     if(!status.ok())
     {
         LOGE("put error: %s", status.getState());
@@ -298,7 +299,7 @@ int DBManager::close_all() { return -1; }
      {
          return nullptr;
      }
-    auto reader = std::make_shared<TableReader>(db, tbl);
+    auto reader = std::make_shared<TableReader>(db, tbl, _wrapper);
     return reader;
  }
  TableOperatorPtr DBManager::get_table_writer(const std::string &dbname, const std::string &tblname){
@@ -312,7 +313,7 @@ int DBManager::close_all() { return -1; }
      {
          return nullptr;
      }
-    auto writer = std::make_shared<TableOperator>(db, tbl);
+    auto writer = std::make_shared<TableOperator>(db, tbl, _wrapper);
     return writer;
  }
 

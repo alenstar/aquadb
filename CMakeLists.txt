@@ -3,7 +3,7 @@ project(AquaDB C CXX)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 message("CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if($ENV{BUILD_NUMBER})
   set(BUILD_NUMBER $ENV{BUILD_NUMBER})
@@ -212,7 +212,12 @@ endif ()
 #NuRaft
 include(nuraft)
 
+# arrow
+include(arrow)
+#quickjs
+include(quickjs)
 
+find_package(MySQL REQUIRED)
 
 set(PROJECT_INCS
 ${CMAKE_CURRENT_BINARY_DIR}
@@ -221,7 +226,8 @@ ${PROJECT_BINARY_DIR}
 ${PROJECT_SOURCE_DIR}/thirdparty
 ${PROJECT_SOURCE_DIR}/thirdparty/doctest
 ${PROJECT_SOURCE_DIR}/NuRaft/include
-${PROJECT_SOURCE_DIR}/db)
+${PROJECT_SOURCE_DIR}/db
+${ARROW_INCLUDE_DIR})
 
 
 include_directories(${PROJECT_INCS})

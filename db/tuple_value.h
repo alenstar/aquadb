@@ -42,6 +42,7 @@ class BufferArray
         _data = std::move(cv._data);
     }
     inline std::vector<uint8_t> &operator()() noexcept { return _data; }
+    inline const std::vector<uint8_t> &operator()() const noexcept { return _data; }
     inline void push_back(uint8_t v) { return _data.push_back(v); }
     inline size_t size() const { return _data.size(); }
     inline size_t capacity() const { return _data.capacity(); }
@@ -50,6 +51,7 @@ class BufferArray
     inline uint8_t *data() { return _data.data(); }
     inline const uint8_t *data() const { return _data.data(); }
 
+    inline void clear() { _data.clear();}
   private:
     std::vector<uint8_t> _data;
 };
@@ -57,6 +59,7 @@ class BufferArray
 class BufferView
 {
   public:
+    BufferView(const BufferArray& buf) : _data(const_cast<uint8_t*>(buf().data())), _size(buf.size()) {}
     BufferView(uint8_t *data, size_t size) : _data(data), _size(size) {}
     BufferView(const char *data, size_t size) : _data(reinterpret_cast<uint8_t*>( const_cast<char*>(data))), _size(size) {}
     BufferView(const std::vector<uint8_t> &data) : _data(const_cast<uint8_t *>(data.data())), _size(data.size()) {}

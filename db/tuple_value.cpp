@@ -395,7 +395,7 @@ int Value::serialize(uint16_t tag, std::vector<uint8_t> &out) const
                 LOGE("bad dtype:%d for object", dtype());
                 return -1;
             }
-            auto obj = as_object<TupleRecord>();
+            auto obj = as_object<TupleObject>();
             rc       = obj->serialize(static_cast<uint16_t>(0), out);
             if (rc != 0) {
                 return rc;
@@ -433,7 +433,7 @@ int Value::deserialize(BufferView *in, uint16_t &tag)
 {
     uint8_t *data  = reinterpret_cast<uint8_t *>(in->data());
     uint8_t wtype  = TLV_LTYPE_ERROR;
-    char taglen[2] = {0x00};
+    //char taglen[2] = {0x00};
     size_t pos     = 0;
     if (data[0] & 0x80) {
         tag   = (data[0] & 0x7f) | ((data[1] >> 4) & 0x0f);
@@ -537,7 +537,7 @@ int Value::deserialize(BufferView *in, uint16_t &tag)
         // break;
         case TLV_LTYPE_OBJECT: /* object object_size + object_data */
         {
-            auto ptr = new TupleRecord();
+            auto ptr = new TupleObject();
             set_ptr(ptr,static_cast<uint8_t>(DataType::OBJECT));
             uint16_t subtag = 0;
             ptr->deserialize(in, subtag);

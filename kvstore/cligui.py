@@ -493,6 +493,14 @@ if __name__ == '__main__':
                 {'name':'订单','value':'orderlist','op':'get'},
                 {'name':'持仓','value':'positionlist','op':'get'}
             ]
+        },
+        'tushare': {
+            'token':'',
+            'mysql_url':'',
+            'funcs': [
+                {'name':'日线行情','value':'daily','op':'get'},
+                {'name':'持仓','value':'positionlist','op':'get'}
+            ]
         }
     }
     if os.path.isfile(args.conf):

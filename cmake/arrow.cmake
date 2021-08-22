@@ -28,12 +28,14 @@ ExternalProject_Add(
         ${EXTERNAL_PROJECT_LOG_ARGS}
 #        GIT_REPOSITORY "https://github.com/apache/arrow.git"
 #        GIT_TAG "apache-arrow-0.17.1"
-        URL "https://github.com/apache/arrow/archive/apache-arrow-0.17.1.tar.gz"
+        URL "https://github.com/apache/arrow/archive/refs/tags/apache-arrow-5.0.0.tar.gz"
+#        GIT_REPOSITORY "https://gitee.com/mirrors/arrowsource.git"
+#        GIT_TAG "apache-arrow-5.0.0"
         PREFIX ${ARROW_SOURCES_DIR}
         UPDATE_COMMAND ""
         CONFIGURE_COMMAND ""
         BUILD_IN_SOURCE 1
-        BUILD_COMMAND mv ../build.sh . COMMAND sh build.sh
+        BUILD_COMMAND cp -f ../build.sh . COMMAND sh build.sh
         INSTALL_COMMAND mkdir -p ${ARROW_INSTALL_DIR}/lib/ COMMAND cp ${ARROW_SOURCES_DIR}/src/extern_arrow/cpp/build/release/libarrow.a ${ARROW_LIBRARIES} COMMAND mkdir -p ${ARROW_INCLUDE_DIR} COMMAND cp -r ${ARROW_SOURCES_DIR}/src/extern_arrow/cpp/src/arrow ${ARROW_INCLUDE_DIR}/
 )
 

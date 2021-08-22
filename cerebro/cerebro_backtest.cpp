@@ -1,6 +1,7 @@
 #include "cerebro_backtest.h"
 #include "cerebro_broker.h"
 #include "cerebro_recorder.h"
+#include "util/datetime.h"
 
 CerebroBacktest::CerebroBacktest() { broker_ = new CerebroBroker(); }
 CerebroBacktest::~CerebroBacktest() { delete broker_; }
@@ -53,22 +54,24 @@ int CerebroBacktest::run()
     std::unordered_map<Symbol, CerebroTickRecordPtr> quotes;
     CerebroQuotePlayer player;
     player.init(conf_.qtype, nullptr);
+    util::DateTime start_dt(static_cast<util::DateTime::DateType>(conf_.start_date));
+    util::DateTime end_dt(static_cast<util::DateTime::DateType>(conf_.start_date));
 
-    for (int dt = conf_.start_date; dt <= conf_.end_date; ++dt) {
+    for (auto dt = start_dt; dt <= end_dt; dt.add_days(1)) {
         // TODO
         // 跳过非交易日
         for (auto &st : strategys_) {
-            st.second->on_pre_market_open(broker_, dt);
+            st.second->on_pre_market_open(broker_, static_cast<int>(dt.date()));
         }
         // TODO
-        int rc = player.seek_to(dt);
+        int rc = player.seek_to(static_cast<int>(dt.date()));
         if (rc != 0) {
-            LOGE("not found quotes: trading_date=%d", dt);
+            LOGE("not found quotes: trading_date=%d", dt.date());
             continue;
         }
 
         for (auto &st : strategys_) {
-            st.second->on_market_open(broker_, dt);
+            st.second->on_market_open(broker_, static_cast<int>(dt.date()));
         }
 
         CerebroTickRecordPtr quote;
@@ -90,20 +93,20 @@ int CerebroBacktest::run()
 
         // 收盘
         for (auto &st : strategys_) {
-            st.second->on_market_close(broker_, dt);
+            st.second->on_market_close(broker_,  static_cast<int>(dt.date()));
         }
 
         // 盘后结算
         std::vector<CerebroKlineRecord> records;
-        rc = player.get_daily_kline(dt, records);
+        rc = player.get_daily_kline( static_cast<int>(dt.date()), records);
         if(rc != 0) {
-            LOGE("get daily kline fail, dt=%d",dt);
+            LOGE("get daily kline fail, dt=%d",  static_cast<int>(dt.date()));
         } else {
             broker_->settle(records);
         }
         //收盘后
         for (auto &st : strategys_) {
-            st.second->on_aft_market_close(broker_, dt);
+            st.second->on_aft_market_close(broker_,  static_cast<int>(dt.date()));
         }
     }
     return 0;

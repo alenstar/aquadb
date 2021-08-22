@@ -31,6 +31,7 @@ limitations under the License.
 #include <stdio.h>
 
 #include <gflags/gflags.h>
+INITIALIZE_EASYLOGGINGPP
 
 DEFINE_int32(server_id, 1, "server id");
 DEFINE_int32(datacenter_id, 1, "datacenter id");
@@ -75,7 +76,7 @@ int init_raft(GlobalContext* ctx) {
         return rc;
     }
     // raft log store
-    ctx->raft_log_store_ = std::make_shared<aquadb::RaftLogStore>(aquadb::RocksWrapper::get_instance());
+    ctx->raft_log_store_ = std::make_shared<aquadb::RaftLogStore>(aquadb::DBManager::get_instance()->get_wrapper());
 
 
     nuraft::ptr<logger_wrapper> log_wrap = nuraft::cs_new<logger_wrapper>( log_file_name, 4 );

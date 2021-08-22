@@ -30,7 +30,7 @@ class TupleDescriptor
 
     int serialize(std::vector<uint8_t> &out)
     {
-        TupleRecord obj;
+        TupleObject obj;
         obj.insert(1, Value(id));
         obj.insert(2, Value(type));
         obj.insert(3, Value(name));
@@ -40,7 +40,7 @@ class TupleDescriptor
     }
     int deserialize(const std::vector<uint8_t> &in)
     {
-        TupleRecord obj;
+        TupleObject obj;
         int rc = obj.deserialize(in);
         if (rc != 0) {
             return rc;
@@ -102,7 +102,7 @@ class IndexDescriptor
 
     int serialize(std::vector<uint8_t> &out)
     {
-        TupleRecord obj;
+        TupleObject obj;
         obj.insert(1, Value(id));
         obj.insert(2, Value(type));
         obj.insert(3, Value(name));
@@ -112,7 +112,7 @@ class IndexDescriptor
     }
     int deserialize(const std::vector<uint8_t> &in)
     {
-        TupleRecord obj;
+        TupleObject obj;
         int rc = obj.deserialize(in);
         if (rc != 0) {
             return rc;
@@ -238,7 +238,7 @@ class FieldDescriptor
 
     //void set_type(uint16_t dtp, uint16_t ptp) { type = dtp | (ptp << 8); }
     bool is_unsigned() const { return flags & 0x04; }
-    int serialize(TupleRecord &out) const
+    int serialize(TupleObject &out) const
     {
         out.insert(1, Value(name));
         out.insert(2, Value(id));
@@ -249,7 +249,7 @@ class FieldDescriptor
         out.insert(7, Value(extra));
         return 0;
     }
-    int deserialize(const TupleRecord &in)
+    int deserialize(const TupleObject &in)
     {
         if (in.has(1)) name = in.get(1)->to_string();
 
@@ -350,24 +350,24 @@ class TableDescriptor
     }
 
     // 获取索引key
-    inline int get_index_key(const IndexDescriptor* index,TupleRecord &obj, MutTableKey &key) { return get_index_key(index->fields,obj, key);}
-    int get_index_key(const std::vector<uint16_t> &fields,TupleRecord &obj, MutTableKey &key);
+    inline int get_index_key(const IndexDescriptor* index,TupleObject &obj, MutTableKey &key) { return get_index_key(index->fields,obj, key);}
+    int get_index_key(const std::vector<uint16_t> &fields,TupleObject &obj, MutTableKey &key);
     // 获取主键key
-    int get_primary_key(TupleRecord &obj, MutTableKey &key);
+    int get_primary_key(TupleObject &obj, MutTableKey &key);
 
     int serialize(std::vector<uint8_t> &out) const
     {
-        TupleRecord obj;
+        TupleObject obj;
         obj.insert(1, Value(id));
         obj.insert(2, Value(version));
         obj.insert(3, Value(name));
         obj.insert(4, Value(comment));
         // 采用小端
         obj.insert(5, Value(reinterpret_cast<const char *>(_primarykey->fields.data()), _primarykey->fields.size() * sizeof(uint16_t)));
-        TupleRecord subobj;
+        TupleObject subobj;
         obj.insert(6, std::move(subobj));
         for (auto const &field : fields) {
-            TupleRecord item;
+            TupleObject item;
             field.second.serialize(item);
             subobj.insert(field.first, std::move(item));
         }
@@ -381,7 +381,7 @@ class TableDescriptor
     }
     int deserialize(BufferView &in)
     {
-        TupleRecord obj;
+        TupleObject obj;
         int rc = obj.deserialize(in);
         if (rc != 0) {
             return rc;
@@ -411,7 +411,7 @@ class TableDescriptor
         }
 
         if (obj.has(6)) {
-            auto subobj = obj.get(6)->as_object<TupleRecord>();
+            auto subobj = obj.get(6)->as_object<TupleObject>();
             // TODO
             FieldDescriptor field;
             if (field.deserialize(*subobj) != 0) {
@@ -460,7 +460,7 @@ class TableDescriptor
     }
 
     const FieldDescriptor* get_field_descriptor(const std::string& name) const {
-        auto it = std::find_if(fields.cbegin(), fields.cend(), [name](const std::map<int, FieldDescriptor>::value_type & item ){ return item.second.name == name;});
+        auto it = std::find_if(fields.cbegin(), fields.cend(), [&name](const std::map<int, FieldDescriptor>::value_type & item ){ return item.second.name == name;});
         if(it == fields.cend())
         {
             return nullptr;
@@ -475,6 +475,23 @@ class TableDescriptor
         }
         return &(it->second);
     } 
+    int get_field_id(const std::string& name) const {
+        auto it = std::find_if(fields.cbegin(), fields.cend(), [&name](const std::map<int,FieldDescriptor>::value_type& v){ return v.second.name == name;});
+        if(it == fields.cend())
+        {
+            return -1;
+        }
+        return it->second.id;
+    }
+
+    std::vector<std::string> get_fields_name() const {
+        std::vector<std::string> names;
+       for (auto const& it: fields)
+       {
+           names.push_back(it.second.name);
+       } 
+       return names;
+    }
 
     void add_field(FieldDescriptor p)
     {
@@ -544,7 +561,7 @@ class DatabaseDescriptor
 
     int serialize(std::vector<uint8_t> &out) const
     {
-        TupleRecord obj;
+        TupleObject obj;
         obj.insert(1, Value(id));
         obj.insert(2, Value(version));
         obj.insert(3, Value(name));
@@ -552,10 +569,10 @@ class DatabaseDescriptor
         obj.insert(5, Value(status));
         //// 采用小端
         //obj.insert(5, Value(reinterpret_cast<const char *>(_primarykey->fields.data()), _primarykey->fields.size() * sizeof(uint16_t)));
-        TupleRecord subobj;
+        TupleObject subobj;
         obj.insert(6, std::move(subobj));
         for (auto const &field : fields) {
-            TupleRecord item;
+            TupleObject item;
             field.second.serialize(item);
             subobj.insert(field.first, std::move(item));
         }
@@ -569,7 +586,7 @@ class DatabaseDescriptor
     }
     int deserialize(BufferView &in)
     {
-        TupleRecord obj;
+        TupleObject obj;
         int rc = obj.deserialize(in);
         if (rc != 0) {
             return rc;
@@ -588,7 +605,7 @@ class DatabaseDescriptor
         }
 
         if (obj.has(6)) {
-            auto subobj = obj.get(6)->as_object<TupleRecord>();
+            auto subobj = obj.get(6)->as_object<TupleObject>();
             // TODO
             FieldDescriptor field;
             if (field.deserialize(*subobj) != 0) {

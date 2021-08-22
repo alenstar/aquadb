@@ -21,8 +21,9 @@ DOC "GNU CMake")
 ExternalProject_Add(
         extern_quickjs
         ${EXTERNAL_PROJECT_LOG_ARGS}
-        GIT_REPOSITORY "https://gitee.com/mirrors/QUICKJS.git"
-        GIT_TAG "v1.9.3"
+        #GIT_REPOSITORY "https://gitee.com/mirrors/QuickJS.git"
+        #GIT_TAG "20200705"
+        URL "https://bellard.org/quickjs/quickjs-2021-03-27.tar.xz"
         PREFIX ${QUICKJS_SOURCES_DIR}
         #SOURCE_DIR ${QUICKJS_SOURCE_DIR}
         #BINARY_DIR ${QUICKJS_BINARY_DIR}

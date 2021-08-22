@@ -52,7 +52,7 @@ inline int field_fixed_size(const FieldDescriptor *field) {
 
 
 // 获取索引key
-int TableDescriptor::get_index_key(const std::vector<uint16_t> &fields, TupleRecord &obj, MutTableKey &key)
+int TableDescriptor::get_index_key(const std::vector<uint16_t> &fields, TupleObject &obj, MutTableKey &key)
 {
     std::vector<const FieldDescriptor *> infos;
     int rc = get_index_key_info(fields, infos);
@@ -70,7 +70,7 @@ int TableDescriptor::get_index_key(const std::vector<uint16_t> &fields, TupleRec
     return 0;
 }
 // 获取主键key
-int TableDescriptor::get_primary_key(TupleRecord &obj,MutTableKey &key)
+int TableDescriptor::get_primary_key(TupleObject &obj,MutTableKey &key)
 {
 
     std::vector<const FieldDescriptor *> infos;

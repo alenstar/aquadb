@@ -5,11 +5,12 @@
 #include "doctest.h"
 #include "db/tuple_record.h"
 #include "util/logdef.h"
+INITIALIZE_EASYLOGGINGPP
 
 using namespace aquadb;
 
 TEST_CASE("testing the tlv_object") {
-    TupleRecord obj;
+    TupleObject obj;
     Value a(1);
     Value b(9889878);
     Value c(0);
@@ -29,7 +30,7 @@ TEST_CASE("testing the tlv_object") {
     obj.serialize(out);
     LOGI("serialize size=%lu", out.size());
 
-    TupleRecord obj2;
+    TupleObject obj2;
     obj2.deserialize(out);
     CHECK(obj.size() == obj2.size());
     CHECK(obj2.get(0) == nullptr);

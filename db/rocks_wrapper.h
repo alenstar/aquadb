@@ -57,11 +57,12 @@ class RocksWrapper
     static std::atomic<int64_t> mata_cf_remove_range_count;
 
     virtual ~RocksWrapper() {}
-    static RocksWrapper *get_instance()
-    {
-        static RocksWrapper _instance;
-        return &_instance;
-    }
+    RocksWrapper();
+    //static RocksWrapper *get_instance()
+    //{
+    //    static RocksWrapper _instance;
+    //    return &_instance;
+    //}
 
     int32_t init(const std::string &path);
 
@@ -211,7 +212,7 @@ class RocksWrapper
     uint64_t flush_file_number() { return _flush_file_number; }
 
   private:
-    RocksWrapper();
+    // RocksWrapper();
 
     std::string _db_path;
 

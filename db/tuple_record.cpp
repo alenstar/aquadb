@@ -19,7 +19,7 @@ Array::~Array()
     {
         if (v.dtype() == 100)
         {
-            auto p = v.as_object<TupleRecord>();
+            auto p = v.as_object<TupleObject>();
             delete p;
             v.clear();
         }
@@ -87,7 +87,7 @@ int Array::serialize(uint16_t tag, std::vector<uint8_t> &out) const
         break;
         case 100: // object
         {
-            auto obj = v.as_object<TupleRecord>();
+            auto obj = v.as_object<TupleObject>();
             obj->serialize(static_cast<uint16_t>(0), out);
         }
         break;
@@ -124,7 +124,7 @@ int Array::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     }
     return 0;
 }
-int Array::deserialize(const std::string &in) 
+int Array::deserialize(const std::string &in)
 {
     // TODO
     uint16_t tag = 0;
@@ -183,16 +183,143 @@ int Array::deserialize(BufferView *in, uint16_t &tag)
     return 0;
 }
 
-TupleRecord::TupleRecord() {}
-TupleRecord::TupleRecord(TupleRecord &&o) { _values = std::move(o._values); }
+//////////////////////////////////////////////////////////////////////////
+TupleBuffer::TupleBuffer() {}
 
-TupleRecord::~TupleRecord()
+int TupleBuffer::append(int tag, const Value &val) { return serialize(static_cast<uint16_t>(tag), val, &buffer_); }
+
+// 序列化
+int TupleBuffer::serialize(uint16_t tag, const Value &val, BufferArray *out)
+{
+    uint8_t wtype = TLV_LTYPE_OBJECT;
+    uint8_t taglen[2] = {0x00};
+    if (tag < 0x08)
+    {
+        taglen[0] = (tag << 4) | wtype;
+        out->push_back(taglen[0]);
+    }
+    else if (tag < 0x800) // 2048
+    {
+        taglen[0] = (tag & 0x007f) | 0x80;
+        taglen[1] = (((tag >> 7) & 0x000f) << 4) | wtype;
+        out->push_back(taglen[0]);
+        out->push_back(taglen[1]);
+    }
+    else
+    {
+        // tag number is too big [0~2047]
+        // error
+        // TODO
+        LOGE("tag number is too big [0~2000]");
+        return -1;
+    }
+    // TODO
+    int rc = 0;
+
+    LOGD("tag=%d, dtype=%d, value=%s, size=%lu,%lu", tag, val.dtype(), val.to_string().c_str(), out->size(),
+         val.size());
+    switch (val.dtype())
+    {
+    case 0: //
+    case 1:
+    case 2:
+    case 3:
+        rc = val.serialize(static_cast<uint16_t>(tag), (*out)());
+        if (rc != 0)
+        {
+            LOGE("serialize fail:tag=%d, dtype=%d, value=%s, size=%lu,%lu", tag, val.dtype(), val.to_string().c_str(),
+                 out->size(), val.size());
+            return rc;
+        }
+        break;
+    case Value::DataType::OBJECT: // object
+    {
+        auto obj = val.as_object<TupleObject>();
+        rc = obj->serialize(static_cast<uint16_t>(tag), (*out)());
+        if (rc != 0)
+        {
+            LOGE("serialize fail:tag=%d, dtype=%d, value=%s, size=%lu,%lu", tag, val.dtype(), val.to_string().c_str(),
+                 out->size(), val.size());
+            return rc;
+        }
+    }
+    break;
+    case Value::DataType::ARRAY: // array
+    {
+        auto arr = val.as_object<Array>();
+        rc = arr->serialize(static_cast<uint16_t>(tag), (*out)());
+        if (rc != 0)
+        {
+            LOGE("serialize fail:tag=%d, dtype=%d, value=%s, size=%lu,%lu", tag, val.dtype(), val.to_string().c_str(),
+                 out->size(), val.size());
+            return rc;
+        }
+    }
+    break;
+        /* code */
+    //    break;
+    default:
+        break;
+    }
+    return rc;
+}
+
+////////////////////////////////////////////////////////
+
+int TupleView::extract(int tag, Value &val)
+{
+    int stag = 0;
+    while(next(stag, val) != 0)
+    {
+        if (stag == tag)
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+int TupleView::next(int &tag, Value &val)
+{
+    auto in = &view_;
+    val.clear();
+    if (in->size() == 0)
+    {
+        // 没有数据了
+        return 1;
+    }
+    uint16_t stag = 0;
+    int rc = val.deserialize(in, stag);
+    tag = stag;
+    if (rc != 0)
+    {
+        LOGE("deserialize fail");
+    }
+    return rc;
+}
+
+// 反序列化
+int TupleView::deserialize(BufferView *in, uint16_t &tag, Value &val)
+{
+    if (in->size() == 0)
+    {
+        // 空对象不解码
+        val.clear();
+        return 0;
+    }
+    return val.deserialize(in, tag);
+}
+//////////////////////////////////////////////////////////////////////////
+
+TupleObject::TupleObject() {}
+TupleObject::TupleObject(TupleObject &&o) { _values = std::move(o._values); }
+
+TupleObject::~TupleObject()
 {
     for (auto v : _values)
     {
         if (v.second.dtype() == 100)
         {
-            auto p = v.second.as_object<TupleRecord>();
+            auto p = v.second.as_object<TupleObject>();
             delete p;
             v.second.clear();
         }
@@ -206,7 +333,7 @@ TupleRecord::~TupleRecord()
     _values.clear();
 }
 
-int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
+int TupleObject::serialize(uint16_t tag, std::vector<uint8_t> &out) const
 {
     if (_values.empty())
     {
@@ -258,7 +385,7 @@ int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
             break;
         case Value::DataType::OBJECT: // object
         {
-            auto obj = v.second.as_object<TupleRecord>();
+            auto obj = v.second.as_object<TupleObject>();
             rc = obj->serialize(static_cast<uint16_t>(v.first), out);
             if (rc != 0)
             {
@@ -290,7 +417,7 @@ int TupleRecord::serialize(uint16_t tag, std::vector<uint8_t> &out) const
     return 0;
 }
 
-int TupleRecord::deserialize(const std::string &in)
+int TupleObject::deserialize(const std::string &in)
 {
     if (in.empty())
     {
@@ -303,7 +430,7 @@ int TupleRecord::deserialize(const std::string &in)
     return deserialize(&buf, tag);
 }
 
-int TupleRecord::deserialize(const std::vector<uint8_t> &in)
+int TupleObject::deserialize(const std::vector<uint8_t> &in)
 {
     if (in.empty())
     {
@@ -316,7 +443,7 @@ int TupleRecord::deserialize(const std::vector<uint8_t> &in)
     return deserialize(&buf, tag);
 }
 
-int TupleRecord::deserialize(BufferView& in)
+int TupleObject::deserialize(BufferView &in)
 {
     if (in.empty())
     {
@@ -327,7 +454,7 @@ int TupleRecord::deserialize(BufferView& in)
     return deserialize(&in, tag);
 }
 
-int TupleRecord::deserialize(BufferView *in, uint16_t &tag)
+int TupleObject::deserialize(BufferView *in, uint16_t &tag)
 {
     if (in->size() == 0)
     {
@@ -350,7 +477,7 @@ int TupleRecord::deserialize(BufferView *in, uint16_t &tag)
         wtype = data[0] & 0x000f;
         pos += 1;
     }
-    //LOGD("tag=%d, wtype=%d, pos=%lu", tag, wtype, pos);
+    // LOGD("tag=%d, wtype=%d, pos=%lu", tag, wtype, pos);
     in->peek(pos);
     // TODO
     // std::string buf = in.substr(pos);
@@ -377,47 +504,46 @@ int TupleRecord::deserialize(BufferView *in, uint16_t &tag)
     return 0;
 }
 
-
 ////////////////////////////////////////
 
-int serialize_bytes(uint16_t tag, const char *values, size_t size,  std::vector<uint8_t> &out)
+int serialize_bytes(uint16_t tag, const char *values, size_t size, std::vector<uint8_t> &out)
 {
     if (size == 0)
     {
         // 空对象不编码
         return 0;
     }
-    //uint8_t wtype = TLV_LTYPE_BYTES;
+    // uint8_t wtype = TLV_LTYPE_BYTES;
     char taglen[2] = {0x00};
     // TODO
     return -1;
 }
 
-int serialize_array2(uint16_t tag, const std::vector<int16_t> &values,  std::vector<uint8_t> &out)
+int serialize_array2(uint16_t tag, const std::vector<int16_t> &values, std::vector<uint8_t> &out)
 {
     if (values.empty())
     {
         // 空对象不编码
         return 0;
     }
-    //uint8_t wtype = TLV_LTYPE_ARRAY2;
+    // uint8_t wtype = TLV_LTYPE_ARRAY2;
     char taglen[2] = {0x00};
     // TODO
     return -1;
 }
 
-int serialize_array2(uint16_t tag, const std::vector<uint16_t> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array2(uint16_t tag, const std::vector<uint16_t> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_array4(uint16_t tag, const std::vector<int32_t> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array4(uint16_t tag, const std::vector<int32_t> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_array4(uint16_t tag, const std::vector<uint32_t> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array4(uint16_t tag, const std::vector<uint32_t> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_array4(uint16_t tag, const std::vector<float> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array4(uint16_t tag, const std::vector<float> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_array8(uint16_t tag, const std::vector<int64_t> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array8(uint16_t tag, const std::vector<int64_t> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_array8(uint16_t tag, const std::vector<double> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_array8(uint16_t tag, const std::vector<double> &values, std::vector<uint8_t> &out) { return -1; }
 
-int serialize_object(uint16_t tag, const std::vector<double> &values,  std::vector<uint8_t> &out) { return -1; }
+int serialize_object(uint16_t tag, const std::vector<double> &values, std::vector<uint8_t> &out) { return -1; }
 
 } // namespace aquadb

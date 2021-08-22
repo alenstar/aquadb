@@ -55,14 +55,16 @@ class DBManager
     TableOperatorPtr get_table_writer(const std::string &dbname, const std::string &tblname);
     TableDescriptorPtr get_table_descriptor(const std::string &dbname, const std::string &tblname);
 
+    RocksWrapper* get_wrapper() {return _wrapper;}
   private:
-    DBManager() = default;
+    DBManager();
 
     DatabaseDescriptorPtr get_db_descriptor(const std::string &dbname) { auto it = _name2dbi.find(dbname);
     if(it != _name2dbi.cend()) {return it->second;}
     return nullptr;
      }
     std::string _basepath;
+    RocksWrapper* _wrapper{nullptr};
     // lmdb::env _env{nullptr};
     // std::map<std::string,uint32_t> _name2dbi;
     std::map<std::string, DatabaseDescriptorPtr> _name2dbi;

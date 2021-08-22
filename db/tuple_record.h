@@ -10,7 +10,7 @@ namespace aquadb
 {
 
 // class Value;
-class TupleRecord;
+class TupleObject;
 // class BufferView;
 
 class Array
@@ -21,7 +21,7 @@ class Array
     ~Array();
 
     void append(const Value &v);
-    void append(const TupleRecord &v);
+    void append(const TupleObject &v);
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
     int deserialize(const std::vector<uint8_t> &in) ;
@@ -32,13 +32,41 @@ class Array
     std::vector<Value> _values;
 };
 
-// TupleRecord or TlvObj
-class TupleRecord
+class TupleBuffer
+{
+    public:
+    TupleBuffer();
+    inline BufferArray &operator()() noexcept { return buffer_; }
+    inline const BufferArray &operator()() const noexcept { return buffer_; }
+
+    int append(int tag,const Value& val);
+    void clear() { buffer_.clear();}
+
+    // 序列化
+    static int serialize(uint16_t tag, const Value& val, BufferArray *out);
+    private:
+    BufferArray buffer_;
+};
+class TupleView
+{
+    public:
+    TupleView(const TupleBuffer& buffer): view_(buffer()) {}
+    TupleView(const BufferArray& buffer): view_(buffer) {}
+    int extract(int tag, Value& val);
+    int next(int& tag, Value& val);
+    // 反序列化
+    static int deserialize(BufferView *in, uint16_t &tag, Value& val);
+    private:
+    BufferView view_;
+};
+
+// TupleObject or TlvObj
+class TupleObject
 {
   public:
-    TupleRecord();
-    TupleRecord(TupleRecord &&o);
-    ~TupleRecord();
+    TupleObject();
+    TupleObject(TupleObject &&o);
+    ~TupleObject();
 
     int serialize(uint16_t tag, std::vector<uint8_t> &out) const;
     inline int serialize(std::vector<uint8_t> &out) const { return serialize(0, out); }
@@ -57,7 +85,7 @@ class TupleRecord
     // tag range in [0,2047]
     void insert(int tag, const Value &v);
     void insert(int tag, Value &&v);
-    void insert(int tag, TupleRecord &&v);
+    void insert(int tag, TupleObject &&v);
     void insert(int tag, Array &&v);
     void insert(int tag, const std::vector<uint8_t>& v);
     void insert(int tag, const std::vector<int8_t>& v);
@@ -74,43 +102,43 @@ class TupleRecord
 
     const std::map<int, Value>& values() const {return _values;}
   private:
-    TupleRecord &operator=(const TupleRecord &c);
+    TupleObject &operator=(const TupleObject &c);
 
   public:
   private:
     std::map<int, Value> _values;
 };
-inline void TupleRecord::insert(int tag, const Value &v) { _values[tag] = v; }
-inline void TupleRecord::insert(int tag, Value &&v) { _values[tag] = std::move(v); }
+inline void TupleObject::insert(int tag, const Value &v) { _values[tag] = v; }
+inline void TupleObject::insert(int tag, Value &&v) { _values[tag] = std::move(v); }
 
-inline void TupleRecord::insert(int tag, TupleRecord &&v)
+inline void TupleObject::insert(int tag, TupleObject &&v)
 {
     Value val;
-    val.set_ptr(new TupleRecord(std::move(v)), 100);
+    val.set_ptr(new TupleObject(std::move(v)), 100);
     _values[tag] = std::move(val);
 }
-inline void TupleRecord::insert(int tag, Array &&v)
+inline void TupleObject::insert(int tag, Array &&v)
 {
     Value val;
     val.set_ptr(new Array(std::move(v)), 101);
     _values[tag] = std::move(val);
 }
 
-inline void TupleRecord::insert(int tag,const std::vector<uint8_t>& v)
+inline void TupleObject::insert(int tag,const std::vector<uint8_t>& v)
 {
     Value val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
-inline void TupleRecord::insert(int tag, const std::vector<int8_t>& v)
+inline void TupleObject::insert(int tag, const std::vector<int8_t>& v)
 {
     Value val;
     val.set_value(reinterpret_cast<const char*>(v.data()), v.size());
     _values[tag] = std::move(val);
 }
 
-inline const Value *TupleRecord::get(int tag) const
+inline const Value *TupleObject::get(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -120,13 +148,13 @@ inline const Value *TupleRecord::get(int tag) const
     return &(it->second);
 }
 
-inline const Value& TupleRecord::at(int tag) const
+inline const Value& TupleObject::at(int tag) const
 {
     return _values.at(tag);
 }
 
 
-inline Value *TupleRecord::get(int tag) 
+inline Value *TupleObject::get(int tag) 
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -136,12 +164,12 @@ inline Value *TupleRecord::get(int tag)
     return &(it->second);
 }
 
-inline Value& TupleRecord::at(int tag) 
+inline Value& TupleObject::at(int tag) 
 {
     return _values.at(tag);
 }
 
-inline bool TupleRecord::has(int tag) const
+inline bool TupleObject::has(int tag) const
 {
     auto it = _values.find(tag);
     if (it == _values.cend())
@@ -151,13 +179,13 @@ inline bool TupleRecord::has(int tag) const
     return true;
 }
 
-inline size_t TupleRecord::size() const { return _values.size(); }
-inline void TupleRecord::clear() { return _values.clear(); }
+inline size_t TupleObject::size() const { return _values.size(); }
+inline void TupleObject::clear() { return _values.clear(); }
 
 
 ///////////////////////////////////////
 // array<object>
-// int serialize_array0(uint16_t tag, const std::vector<TupleRecord>& values, std::vector<uint8_t>& out);
+// int serialize_array0(uint16_t tag, const std::vector<TupleObject>& values, std::vector<uint8_t>& out);
 
 int serialize_bytes(uint16_t tag, const char *values, size_t size, std::vector<uint8_t> &out);
 

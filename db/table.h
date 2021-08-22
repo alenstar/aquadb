@@ -2,6 +2,7 @@
 #include <memory>
 #include <functional>
 #include "descriptor.h"
+#include "rocks_wrapper.h"
 // #include "rocksdb/db.h"
 
 namespace rocksdb{
@@ -36,29 +37,40 @@ class TableRow
     }
     
 
-    const std::string& name(int idx) const {return names_.at(idx);}
-    int type(int idx) const {return values_.at(idx).dtype();}
-    const Value& value(int idx) const { return values_.at(idx);}
+    const std::string& name(int offset) const {return names_.at(offset);}
+    int type(int offset) const {return values_.at(offset).dtype();}
+    const Value& value(int offset) const { return values_.at(offset);}
+    const Value& value(const std::string& name) const { 
+        auto it = std::find(names_.cbegin(), names_.cend(), name);
+        if(it == names_.cend())
+         {
+             throw std::logic_error("not found the column");
+         }
+         auto offset = std::distance(names_.cbegin(), it);
+        return values_.at(offset);
+        }
     void clear() { names_.clear(); values_.clear();}
     size_t size() const {return values_.size();}
     private:
     std::vector<std::string> names_;
     std::vector<Value> values_;
-    //TupleRecord record_;
+    //TupleObject record_;
 };
 
 class TableRowSet{
     public:
-    TableRowSet(const std::vector<std::string>& names)
+    TableRowSet(const std::vector<std::string>& names): names_(names)
     {
-        names_ = names;
+    }
+    TableRowSet(std::vector<std::string>&& names): names_(names)
+    {
     }
     ~TableRowSet() = default;
 
     void append(const TableRow& row)
     {
         auto sz = row.size();
-        for(auto i =0;i < sz ; ++i)
+        for(size_t i =0;i < sz ; ++i)
         {
             auto const& name = row.name(i);
             auto it = std::find(names_.cbegin(), names_.cend(), name);
@@ -70,6 +82,19 @@ class TableRowSet{
     }
     size_t column_num() const { return values_.size();}
     size_t rows_num() const { return values_.empty() ? 0: values_.cbegin()->size();}
+
+    const std::string& name(int offset) const {return names_.at(offset);}
+    int type(size_t rowid,int offset) const {return values_.at(rowid).at(offset).dtype();}
+    const Value& value(size_t rowid, int offset) const { return values_.at(rowid).at(offset);}
+    const Value& value(size_t rowid,const std::string& name) const { 
+        auto it = std::find(names_.cbegin(), names_.cend(), name);
+        if(it == names_.cend())
+         {
+             throw std::logic_error("not found the column");
+         }
+         auto offset = std::distance(names_.cbegin(), it);
+        return values_.at(rowid).at(offset);
+        }
     public:
     std::vector<std::string> names_;
     std::vector<std::vector<Value>> values_;
@@ -78,7 +103,7 @@ class TableRowSet{
 class TableOperator
 {
     public:
-    TableOperator(DatabaseDescriptorPtr db, TableDescriptorPtr tbl):_db(db),_tbl(tbl) {}
+    TableOperator(DatabaseDescriptorPtr db, TableDescriptorPtr tbl, RocksWrapper* wrapper):_db(db),_tbl(tbl),_wrapper(wrapper) {}
     ~TableOperator() = default;
 
     int put(const Value& key, const Value& val);
@@ -107,16 +132,17 @@ class TableOperator
     MutTableKey build_table_key(const std::vector<Value>& values);
 
     MutTableKey build_table_key(const TableRow& row);
-    MutTableKey build_table_key(const TableRowSet& rows, int idx);
+    MutTableKey build_table_key(const TableRowSet& rows, size_t rowid);
 
     BufferArray build_table_value(const TableRow& row);
-    BufferArray build_table_value(const TableRowSet& rows, int idx);
+    BufferArray build_table_value(const TableRowSet& rows, size_t rowid);
 private:
     MY_DISABLE_COPY(TableOperator);
 
     private:
     DatabaseDescriptorPtr _db;
     TableDescriptorPtr _tbl;
+    RocksWrapper* _wrapper;
     std::string _errmsg;
 };
 typedef std::shared_ptr<TableOperator> TableOperatorPtr;
@@ -124,7 +150,7 @@ typedef std::shared_ptr<TableOperator> TableOperatorPtr;
 class TableReader
 {
     public:
-    TableReader(DatabaseDescriptorPtr db, TableDescriptorPtr tbl):_db(db),_tbl(tbl) {}
+    TableReader(DatabaseDescriptorPtr db, TableDescriptorPtr tbl,RocksWrapper* wrapper):_db(db),_tbl(tbl),_wrapper(wrapper) {}
     ~TableReader() = default;
 
     int seek_to_first(const IndexDescriptor* index, const std::vector<Value>& key);
@@ -148,8 +174,8 @@ class TableReader
 
     int get(const std::vector<Value>& pk, std::vector<Value>& row);
     int get(const Value& key, Value& val);
-    int get(const std::vector<Value>& pk, TupleRecord& record);
-    inline int get(Value& key, TupleRecord& record) { return get({key}, record);}
+    int get(const std::vector<Value>& pk, TupleObject& record);
+    inline int get(Value& key, TupleObject& record) { return get({key}, record);}
 
     inline const std::vector<std::string>& get_columns() const { return _names;}
     inline const std::vector<Value>& get_current_row() const { return _values;}
@@ -160,11 +186,12 @@ private:
     private:
     DatabaseDescriptorPtr _db;
     TableDescriptorPtr _tbl;
+    RocksWrapper* _wrapper;
     std::unique_ptr<rocksdb::Iterator> _iter{nullptr};
     MutTableKey _mutkey;
     std::vector<std::string> _names;
     std::vector<Value> _values;
-    TupleRecord _record;
+    TupleObject _record;
     std::string _errmsg;
 };
 typedef std::shared_ptr<TableReader> TableReaderPtr;

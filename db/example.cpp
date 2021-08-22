@@ -1,6 +1,7 @@
 #include <iostream>
 #include "util/logdef.h"
 #include "db.h"
+INITIALIZE_EASYLOGGINGPP
 
 using namespace aquadb;
 int main(int argc ,char* argv[])
