@@ -37,6 +37,9 @@ class RaftLogStore
     int get_last(uint64_t &index, Value& value);
     int remove(uint64_t index);
     int remove_range(uint64_t start_index, uint64_t end_index);
+    // TODO
+    // uint64_t get_first_idx();
+    // uint64_t get_last_idx();
     private:
     friend RaftLogBundle;
     RocksWrapper* wrapper_{nullptr};

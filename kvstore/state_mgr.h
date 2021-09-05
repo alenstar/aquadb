@@ -17,7 +17,10 @@ limitations under the License.
 
 #pragma once
 
+#include "util/filestream.h"
+#include "util/logdef.h"
 #include "log_store.h"
+#include "in_memory_log_store.hxx"
 
 #include "libnuraft/nuraft.hxx"
 
@@ -39,10 +42,21 @@ public:
     }
 
     ~rocksdb_state_mgr() {}
+    std::string config_filename() const {
+        return std::to_string(my_id_) + std::string("-cluster.config");
+    }
 
     ptr<cluster_config> load_config() {
         // Just return in-memory data in this example.
         // May require reading from disk here, if it has been written to disk.
+        util::FileStream fs(config_filename());
+        if(fs.size()) 
+        {
+        auto buf = buffer::alloc(fs.size());
+        fs.read(buf->data_begin(), fs.size());
+        buf->pos(fs.size());
+        saved_config_ = cluster_config::deserialize(*buf);
+        }
         return saved_config_;
     }
 

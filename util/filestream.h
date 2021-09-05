@@ -1,8 +1,8 @@
 #pragma once
-#include "stream.h"
-namespace Streams {
+#include "iostream.h"
+namespace util {
 
-class FileStream : public Stream {
+class FileStream : public IOStream {
   public:
     FileStream( const std::string &path, int access_mode = AccessMode::READ );
     virtual ~FileStream() override;
@@ -51,5 +51,5 @@ class FileStream : public Stream {
 
 typedef std::shared_ptr<FileStream> FileStreamPtr;
 
-} /* namespace Streams */
+} /* namespace util */
 

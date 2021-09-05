@@ -402,6 +402,7 @@ class RESTWidget(QWidget):
                 params = self._params.get_value()
                 rsp = requests.get(self._endpoint.get_value() + '/' + self._func.get_value() + ( '' if len(params) == 0 else '?'+ params))
             elif self._func.get_op() == 'post':
+                logger.info(f'{self._func.get_value()}|{json.dumps(self._postdata.get_value())}')
                 rsp = requests.post(self._endpoint.get_value() + '/' + self._func.get_value(), headers={'Content-Type': 'application/json'}, data=self._postdata.get_value())
             else:
                 self.showMsgDialog('调用异常','不支持的操作: ' + self._func.get_value() + '|' + self._func.get_op() + '|' + self._endpoint.get_value(), detailed_text=str(e))

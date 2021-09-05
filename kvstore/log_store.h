@@ -64,14 +64,16 @@ public:
 
     void close();
 
+    ulong get_local_last_idx() const;
 private:
     static ptr<log_entry> make_clone(const ptr<log_entry>& entry);
 
     std::map<ulong, ptr<log_entry>> logs_;
     mutable std::mutex logs_lock_;
     std::atomic<ulong> start_idx_;
-    std::atomic<ulong> local_idx_;
+    mutable std::atomic<ulong> local_idx_;
 
+    ptr<log_entry> dummy_entry_ ;
     GlobalContext* ctx_;
 };
 

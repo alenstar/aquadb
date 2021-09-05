@@ -1,6 +1,6 @@
+#include "nlohmann/json.hpp"
 #include "util/common.h"
 #include "util/logdef.h"
-#include "nlohmann/json.hpp"
 
 #include "mdlink.h"
 #include "sina_api.h"
@@ -58,39 +58,38 @@ MarketDataBasic::MarketDataBasic()
          {"Accept-Encoding", "gzip, deflate"}});
     //  _cli->set_proxy("192.168.53.99", 8888);
 }
-MarketDataBasic::~MarketDataBasic() {
-    delete cli_;
-}
-std::string MarketDataBasic::convert_to_inner_code(const std::string& code)
+MarketDataBasic::~MarketDataBasic() { delete cli_; }
+std::string MarketDataBasic::convert_to_inner_code(const std::string &code)
 {
-    if(util::endswith(code, ".SH"))
+    if (util::endswith(code, ".SH"))
     {
-        return std::string("sh") + code.substr(0,6);
+        return std::string("sh") + code.substr(0, 6);
     }
-    else if(util::endswith(code, ".SZ"))
+    else if (util::endswith(code, ".SZ"))
     {
-        return std::string("sz") + code.substr(0,6);
+        return std::string("sz") + code.substr(0, 6);
     }
-    else {
+    else
+    {
         return code;
     }
 }
 
-std::string MarketDataBasic::convert_to_extend_code(const std::string& code)
+std::string MarketDataBasic::convert_to_extend_code(const std::string &code)
 {
-    if(util::startswith(code, "sh"))
+    if (util::startswith(code, "sh"))
     {
-        return code.substr(2,6) + ".SH";
+        return code.substr(2, 6) + ".SH";
     }
-    else if(util::startswith(code, "sz"))
+    else if (util::startswith(code, "sz"))
     {
-        return code.substr(2,6) + ".SZ";
+        return code.substr(2, 6) + ".SZ";
     }
-    else {
+    else
+    {
         return code;
     }
 }
-
 
 int MarketDataBasic::get_codes(std::vector<std::string> &codes)
 {
@@ -100,7 +99,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
     do
     {
         std::string url = "/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=sz_a";
-                std::string out;
+        std::string out;
         int rc = request(cli_, url.c_str(), out);
         if (rc != 0)
         {
@@ -110,7 +109,7 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
         sscanf(out.c_str(), "\"%lu\"", &sza_num);
 
         // std::cout << "sza=" << out << std::endl;
-        size_t max_page = (sza_num + PAGE_SIZE -1) / PAGE_SIZE;
+        size_t max_page = (sza_num + PAGE_SIZE - 1) / PAGE_SIZE;
         for (size_t i = 1; i <= max_page; ++i)
         {
             std::string body;
@@ -128,17 +127,17 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
                 break;
             }
             auto js = nlohmann::json::parse(body);
-            if(!js.is_array())
+            if (!js.is_array())
             {
                 // TODO
                 LOGE("invalid data:%s", body.c_str());
                 return -1;
             }
-            for(auto const& a: js)
+            for (auto const &a : js)
             {
-               codes.push_back(a.at("symbol").get<std::string>());
+                codes.push_back(a.at("symbol").get<std::string>());
             }
-            if(js.size() < PAGE_SIZE)
+            if (js.size() < PAGE_SIZE)
             {
                 break;
             }
@@ -158,8 +157,8 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
         }
         sscanf(out.c_str(), "\"%lu\"", &sha_num);
 
-        //std::cout << "sha=" << out << std::endl;
-        size_t max_page = (sha_num + PAGE_SIZE -1 ) / PAGE_SIZE;
+        // std::cout << "sha=" << out << std::endl;
+        size_t max_page = (sha_num + PAGE_SIZE - 1) / PAGE_SIZE;
         for (size_t i = 1; i <= max_page; ++i)
         {
             std::string body;
@@ -177,17 +176,17 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
                 break;
             }
             auto js = nlohmann::json::parse(body);
-            if(!js.is_array())
+            if (!js.is_array())
             {
                 // TODO
                 LOGE("invalid data:%s", body.c_str());
                 return -1;
             }
-            for(auto const& a: js)
+            for (auto const &a : js)
             {
-               codes.push_back(a.at("symbol").get<std::string>());
+                codes.push_back(a.at("symbol").get<std::string>());
             }
-            if(js.size() < PAGE_SIZE)
+            if (js.size() < PAGE_SIZE)
             {
                 break;
             }
@@ -197,21 +196,21 @@ int MarketDataBasic::get_codes(std::vector<std::string> &codes)
     return 0;
 }
 
-int MarketDataProvider::init(int size, const std::string& api_name)
+int MarketDataProvider::init(int size, const std::string &api_name)
 {
     if (size > 0)
     {
         pool_size_ = size;
     }
-    else 
+    else
     {
         pool_size_ = 4;
     }
-        if(api_name != "sina" && api_name != "tencent")
-        { 
-            LOGE("unknown api_name:%s", api_name.c_str());
-            return -1;
-        }
+    if (api_name != "sina" && api_name != "tencent")
+    {
+        LOGE("unknown api_name:%s", api_name.c_str());
+        return -1;
+    }
 
     api_name_ = api_name;
     thpool_.reset(new util::ThreadPool(pool_size_));
@@ -221,7 +220,7 @@ int MarketDataProvider::init(int size, const std::string& api_name)
     {
         mdlink_api::MdLinkApiPtr api = nullptr;
         if(api_name == "sina")
-        { 
+        {
         api = std::make_shared<sina_api::SinaApi>();
         }
         else if(api_name == "tencent") {
@@ -242,41 +241,41 @@ MdLinkApiPtr MarketDataProvider::get_mdlink_api()
     auto id = std::hash<std::thread::id>()(std::this_thread::get_id());
 
     util::Mutex::Lock lck(api_mtx_);
-    auto it = quotes_api_.find(id); 
-    if(it == quotes_api_.end())
+    auto it = quotes_api_.find(id);
+    if (it == quotes_api_.end())
     {
         mdlink_api::MdLinkApiPtr api = nullptr;
-        if(api_name_ == "sina")
-        { 
-        api = std::make_shared<sina_api::SinaApi>();
+        if (api_name_ == "sina")
+        {
+            api = std::make_shared<sina_api::SinaApi>();
         }
-        else if(api_name_ == "tencent") {
-        api = std::make_shared<tencent_api::TencentApi>();
+        else if (api_name_ == "tencent")
+        {
+            api = std::make_shared<tencent_api::TencentApi>();
         }
         quotes_api_[id] = api;
     }
     return quotes_api_[id];
 }
 
-
- int MarketDataProvider::update_codes()
- {
-     std::vector<std::string> codes;
+int MarketDataProvider::update_codes()
+{
+    std::vector<std::string> codes;
     int rc = basic_.get_codes(codes);
-    if(rc != 0)
+    if (rc != 0)
     {
         LOGE("get_codes failed, rc=%d", rc);
         return rc;
     }
-    LOGD("codes.size=%lu",codes.size());
-    if(codes.empty())
+    LOGD("codes.size=%lu", codes.size());
+    if (codes.empty())
     {
         return 0;
     }
     util::RWMutex::WriteLock lck(codes_mtx_);
     codes_ = std::move(codes);
     return 0;
- }
+}
 
 int MarketDataProvider::update_quotes()
 {
@@ -284,21 +283,21 @@ int MarketDataProvider::update_quotes()
     std::vector<std::string> codes;
     std::vector<std::string> mycodes;
     {
-    util::RWMutex::ReadLock lck(codes_mtx_);
-    mycodes = codes_;
+        util::RWMutex::ReadLock lck(codes_mtx_);
+        mycodes = codes_;
     }
     size_t sz = mycodes.size();
-    for(size_t i = 0; i < sz; ++i)
+    for (size_t i = 0; i < sz; ++i)
     {
         codes.push_back(mycodes.at(i));
-        if(codes.size() == num)
+        if (codes.size() == num)
         {
-            auto fn = [this,codes](){
+            auto fn = [this, codes]() {
                 auto api = get_mdlink_api();
-                api->get_quotes(codes, [this](MarketQuotePtr quote){
+                api->get_quotes(codes, [this](MarketQuotePtr quote) {
                     this->on_quote(quote);
                     return true;
-                } ); 
+                });
             };
             thpool_->AddJob(fn);
 
@@ -306,81 +305,63 @@ int MarketDataProvider::update_quotes()
         }
     }
 
-    if(codes.size())
+    if (codes.size())
     {
-            auto fn = [this,codes](){
-                auto api = get_mdlink_api();
-                api->get_quotes(codes, [this](MarketQuotePtr quote){
-                    this->on_quote(quote);
-                    return true;
-                } ); 
-            };
-            thpool_->AddJob(fn);
-
+        auto fn = [this, codes]() {
+            auto api = get_mdlink_api();
+            api->get_quotes(codes, [this](MarketQuotePtr quote) {
+                this->on_quote(quote);
+                return true;
+            });
+        };
+        thpool_->AddJob(fn);
     }
     return 0;
 }
 
-int MarketDataProvider::update_quotes(const std::string& code)
+int MarketDataProvider::update_quotes(const std::string &code)
 {
     auto c = MarketDataBasic::convert_to_inner_code(code);
-            auto fn = [this,c](){
-                auto api = get_mdlink_api();
-                api->get_quotes({c}, [this](MarketQuotePtr quote){
-                    this->on_quote(quote);
-                    return true;
-                } ); 
-            };
-            thpool_->AddJob(fn);
+    auto fn = [this, c]() {
+        auto api = get_mdlink_api();
+        api->get_quotes({c}, [this](MarketQuotePtr quote) {
+            this->on_quote(quote);
+            return true;
+        });
+    };
+    thpool_->AddJob(fn);
     return 0;
 }
 
-
-        bool MarketDataProvider::on_quote(MarketQuotePtr quote)
+bool MarketDataProvider::on_quote(MarketQuotePtr quote)
+{
+    // TODO
+    if (!std::isnormal(quote->last))
+    {
+        // 无效行情
+        LOGW("invlaid tick: last price invalid, %f, %s", quote->last, quote->symbol.c_str());
+        return true;
+    }
+    {
+        util::RWMutex::WriteLock lck(quotes_mtx_);
+        auto it = quotes_.find(quote->symbol);
+        if (it == quotes_.end())
         {
-                        // TODO
-            if (!std::isnormal(quote->last))
+            quotes_[quote->symbol] = quote;
+        }
+        else
+        {
+            if (quote->ts <= it->second->ts)
             {
-                // 无效行情
-                LOGW("invlaid tick: last price invalid, %f, %s", quote->last, quote->symbol.c_str());
+                // 剔除旧行情
                 return true;
             }
-            {
-                util::RWMutex::WriteLock lck(quotes_mtx_);
-                auto it = quotes_.find(quote->symbol);
-                if(it == quotes_.end())
-                {
-                    quotes_[quote->symbol] = quote;
-                }
-                else {
-                    if(quote->ts <= it->second->ts)
-                    {
-                        // 剔除旧行情
-                        return true;
-                    }
-                }
-            }
-            if(quotes_callback_) {
-                return quotes_callback_(quote);
-            }
-            return true;
         }
-
-
-        int MarketDataProvider::get_daily_kline(int dt, std::vector<CerebroKlineRecord>& records)
-        {
-            return -1;
-        }
-        int MarketDataProvider::get_daily_kline_by_range(const Symbol& symbol, int start_dt, int end_dt, std::vector<CerebroKlineRecord>& records)
-        {
-            return -1;
-        }
-        int MarketDataProvider::get_daily_kline_by_num(const Symbol& symbol, int end_dt, int num, std::vector<CerebroKlineRecord>& records)
-        {
-            return -1;
-        }
-        int MarketDataProvider::get_minute_kline(const Symbol& symbol, int dt, int span, std::vector<CerebroKlineRecord>& records)
-        {
-            return -1;
-        }
+    }
+    if (quotes_callback_)
+    {
+        return quotes_callback_(quote);
+    }
+    return true;
+}
 }

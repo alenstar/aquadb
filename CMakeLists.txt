@@ -216,6 +216,8 @@ include(nuraft)
 include(arrow)
 #quickjs
 include(quickjs)
+#duckdb
+include(duckdb)
 
 find_package(MySQL REQUIRED)
 
@@ -227,7 +229,8 @@ ${PROJECT_SOURCE_DIR}/thirdparty
 ${PROJECT_SOURCE_DIR}/thirdparty/doctest
 ${PROJECT_SOURCE_DIR}/NuRaft/include
 ${PROJECT_SOURCE_DIR}/db
-${ARROW_INCLUDE_DIR})
+${ARROW_INCLUDE_DIR}
+${DUCKDB_INCLUDE_DIR})
 
 
 include_directories(${PROJECT_INCS})

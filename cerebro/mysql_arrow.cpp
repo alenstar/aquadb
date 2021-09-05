@@ -3,6 +3,8 @@
 #include <iostream>
 #include <stdio.h>
 
+#include "util/logdef.h"
+
 std::shared_ptr<arrow::Field> getField(const char *, int, bool);
 
 std::shared_ptr<arrow::RecordBatch> convertArrow(MYSQL_RES *result, int batchNum) {
@@ -26,7 +28,7 @@ std::shared_ptr<arrow::RecordBatch> convertArrow(MYSQL_RES *result, int batchNum
   std::unique_ptr<arrow::RecordBatchBuilder> builder;
   auto status = arrow::RecordBatchBuilder::Make(schema, arrow::default_memory_pool(), &builder);
   if (!status.ok()) {
-    std::cout << "not build" << std::endl;
+    LOGE("RecordBatchBuilder Make failed");
     return NULL;
   }
 
@@ -40,10 +42,10 @@ std::shared_ptr<arrow::RecordBatch> convertArrow(MYSQL_RES *result, int batchNum
         } else if (type == MYSQL_TYPE_VAR_STRING) {
           s = builder->GetFieldAs<arrow::StringBuilder>(i)->Append(row[i]);
         } else {
-          std::cout << "not type" << std::endl;
+          LOGW("not supported type:%d", static_cast<int>(type));
         }
         if (!s.ok()) {
-          std::cout << "set failed" << std::endl;
+          LOGW("builder Append failed");
         }
       }
       loopCnt++;
@@ -56,7 +58,7 @@ std::shared_ptr<arrow::RecordBatch> convertArrow(MYSQL_RES *result, int batchNum
   std::shared_ptr<arrow::RecordBatch> batch;
   status = builder->Flush(&batch);
   if (!status.ok()) {
-    std::cout << "flush failed!!" << std::endl;
+    LOGE("builder flush failed!!");
     return NULL;
   }
 
@@ -69,7 +71,7 @@ std::shared_ptr<arrow::Field> getField(const char * name, int type, bool nullabl
   } else if (type == MYSQL_TYPE_VAR_STRING) {
     return arrow::field(name, arrow::utf8(), nullable);
   } else {
-    std::cout << "undefined column(" << name << ") type is " << type << std::endl;
+    LOGE("undefined column(%s) type is %d",name, type);
     return arrow::field(name, arrow::null(), nullable);
   }
 }

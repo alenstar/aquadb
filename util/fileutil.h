@@ -13,6 +13,7 @@
 
 #include "commontypes.h"
 
+namespace util {
 // User directory indices for GetUserPath
 enum {
     D_USER_IDX,
@@ -196,6 +197,7 @@ std::string GetExeDirectory();
 
 bool WriteStringToFile(const std::string &str, const std::string &filename);
 bool ReadFileToString(const std::string &filename, std::string &str);
+bool ReadFileToBytes(const std::string &filename, std::vector<uint8_t>& bytes);
 
 // To deal with Windows being dumb at unicode:
 template <typename T>
@@ -210,3 +212,4 @@ void OpenFStream(T &fstream, const std::string &filename,
 }
 
 } // namespace File
+} // namespace util

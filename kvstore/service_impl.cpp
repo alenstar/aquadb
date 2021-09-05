@@ -47,7 +47,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         nlohmann::json js;
         ServerRaftStatus out;
         int rc = Status(out);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -63,7 +63,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         nlohmann::json js;
         std::vector<ServerRaftConfig> out;
         int rc = ServerList(out);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -72,7 +72,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         {
             if (out.empty())
             {
-                js["data"] = nullptr;
+                // js["data"] = nullptr;
             }
             else
             {
@@ -90,14 +90,14 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         nlohmann::json js = nlohmann::json::parse(req.body);
         int rc = AddServer(js.at("server_id").get<int>(), js.at("endpoint").get<std::string>());
         js.clear();
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
         }
         else
         {
-            js["data"] = nullptr;
+            // js["data"] = nullptr;
         }
         res.set_content(js.dump(), "application/json");
     });
@@ -105,7 +105,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         nlohmann::json js = nlohmann::json::parse(req.body);
         std::string out;
         int rc = RemoveServer(js.at("server_id").get<int>());
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -123,7 +123,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         std::string code = req.get_param_value("codes"); 
         std::vector<CerebroTickRecordPtr> records;
         int rc = GetQuotes({code}, records);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -155,7 +155,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         }
         std::string out;
         int rc = SubscribeQuotes(codes);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -184,7 +184,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
             }
             else 
             {
-            js["ret_code"] = -1;
+            js["err_code"] = -1;
             js["err_msg"] = "invalid param: not found trader_id or trader_name";
         res.set_content(js.dump(), "application/json");
         return;
@@ -192,12 +192,12 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         }
         if (trader == nullptr)
         {
-            js["ret_code"] = -1;
+            js["err_code"] = -1;
             js["err_msg"] = "not found the trader";
         }
         else
         {
-            js["ret_code"] = 0;
+            js["err_code"] = 0;
             js["data"] = trader->to_json();
         }
         res.set_content(js.dump(), "application/json");
@@ -208,7 +208,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         auto trader = CreateTrader(js.at("name").get<std::string>(), js.at("cash").get<double>());
 
         js.clear();
-        js["ret_code"] = trader ? 0:-1;
+        js["err_code"] = trader ? 0:-1;
         if (trader == nullptr)
         {
             js["err_msg"] = "internal error";
@@ -224,7 +224,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         int rc = DeleteTrader(js.at("id").get<int64_t>());
 
         js.clear();
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -245,12 +245,12 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         js.clear();
         if (rc < 1)
         {
-            js["ret_code"] = -1;
+            js["err_code"] = -1;
             js["err_msg"] = "internal error";
         }
         else
         {
-            js["ret_code"] = 0;
+            js["err_code"] = 0;
             nlohmann::json subjs;
             subjs["order_id"] = rc;
             js["data"] = subjs;
@@ -264,12 +264,12 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         js.clear();
         if (rc < 1)
         {
-            js["ret_code"] = -1;
+            js["err_code"] = -1;
             js["err_msg"] = "internal error";
         }
         else
         {
-            js["ret_code"] = 0;
+            js["err_code"] = 0;
             nlohmann::json subjs;
             subjs["order_id"] = rc;
             js["data"] = subjs;
@@ -282,7 +282,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         auto trader_id = util::strto<int64_t>(req.get_param_value("trader_id")); 
         std::vector<CerebroOrder> records;
         int rc = OrderList(trader_id, records);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";
@@ -299,7 +299,7 @@ int HttpServiceImpl::Init(GlobalContext *ctx)
         auto trader_id = util::strto<int64_t>(req.get_param_value("trader_id")); 
         std::vector<CerebroPosition> records;
         int rc = PositionList(trader_id, records);
-        js["ret_code"] = rc;
+        js["err_code"] = rc;
         if (rc != 0)
         {
             js["err_msg"] = "internal error";

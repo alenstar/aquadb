@@ -124,8 +124,7 @@ int init_raft(GlobalContext* ctx) {
                                                 asio_opt,
                                                 params);
     if (!ctx->raft_instance_) {
-        std::cerr << "Failed to initialize launcher (see the message "
-                     "in the log file)." << std::endl;
+        LOGE("Failed to initialize launcher (see the message in the log file).");
         log_wrap.reset();
         //exit(-1);
         return -1;
@@ -133,14 +132,12 @@ int init_raft(GlobalContext* ctx) {
 
     // Wait until Raft server is ready (upto 5 seconds).
     const size_t MAX_TRY = 20;
-    LOGI("init Raft instance ");
+    LOGI("init Raft instance begin ...");
     for (size_t ii=0; ii<MAX_TRY; ++ii) {
         if (ctx->raft_instance_->is_initialized()) {
-            std::cout << " done" << std::endl;
+            LOGI("init Raft instance finished");
             return 0;
         }
-        std::cout << ".";
-        fflush(stdout);
         //TestSuite::sleep_ms(250);
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }

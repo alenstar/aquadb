@@ -1,5 +1,6 @@
 #pragma once
 
+#include "datetime.h"
 #include <easyloggingpp/easylogging++.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,9 +8,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#define def_msleep( M ) usleep( 1000 * ( M ) )
-#define def_min( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
-#define def_max( a, b ) ( ( a ) > ( b ) ? ( a ) : ( b ) )
+#define my_msleep( M ) usleep( 1000 * ( M ) )
+#define my_min( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
+#define my_max( a, b ) ( ( a ) > ( b ) ? ( a ) : ( b ) )
+#define my_nowtime2str() (util::DateTime().string_format(util::DT_FORMAT::ISO_DT_TM))
 
 #ifdef _WIN32
 #define SPDLOG_FILENAME ( strrchr( __FILE__, '\\' ) ? strrchr( __FILE__, '\\' ) + 1 : __FILE__ )
@@ -34,7 +36,7 @@
  * 默认使用stdout输出日志
  * */
 #ifndef SPDLOG_TAG
-#define SPDLOG_TAG "default"
+#define SPDLOG_TAG "[default]"
 #endif
 
 #define LOG_DEBUG( X ) do{LOG( DEBUG ) << X ;}while(0)
@@ -47,30 +49,30 @@
 #if MY_LOG_TYPE == 1 // def DEBUG
 #define LOGD( ... )                                                                                                    \
     do {                                                                                                               \
-        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00};                                                              \
+        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00}; auto nowstr = my_nowtime2str();                                                              \
         snprintf( xlog_tmp_buf__, sizeof( xlog_tmp_buf__ ), ##__VA_ARGS__ );                                           \
-        fprintf( stderr, "[%s] [D] %s::%s() %d|%s\n", SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
+        fprintf( stderr, "%s %s [D] %s::%s() %d|%s\n",nowstr.c_str(), SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
                  xlog_tmp_buf__ );                                                                                     \
     } while ( 0 )
 #define LOGI( ... )                                                                                                    \
     do {                                                                                                               \
-        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00};                                                              \
+        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00}; auto nowstr = my_nowtime2str();                                                             \
         snprintf( xlog_tmp_buf__, sizeof( xlog_tmp_buf__ ), ##__VA_ARGS__ );                                           \
-        fprintf( stderr, "[%s] [I] %s::%s() %d|%s\n", SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
+        fprintf( stderr, "%s %s [I] %s::%s() %d|%s\n",nowstr.c_str(), SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
                  xlog_tmp_buf__ );                                                                                     \
     } while ( 0 )
 #define LOGW( ... )                                                                                                    \
     do {                                                                                                               \
-        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00};                                                              \
+        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00}; auto nowstr = my_nowtime2str();                                                             \
         snprintf( xlog_tmp_buf__, sizeof( xlog_tmp_buf__ ), ##__VA_ARGS__ );                                           \
-        fprintf( stderr, "[%s] [W] %s::%s() %d|%s\n", SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
+        fprintf( stderr, "%s %s [W] %s::%s() %d|%s\n",nowstr.c_str(), SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
                  xlog_tmp_buf__ );                                                                                     \
     } while ( 0 )
 #define LOGE( ... )                                                                                                    \
     do {                                                                                                               \
-        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00};                                                              \
+        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00}; auto nowstr = my_nowtime2str();                                                             \
         snprintf( xlog_tmp_buf__, sizeof( xlog_tmp_buf__ ), ##__VA_ARGS__ );                                           \
-        fprintf( stderr, "[%s] [E] %s::%s() %d|%s\n", SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
+        fprintf( stderr, "%s %s [E] %s::%s() %d|%s\n",nowstr.c_str(), SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
                  xlog_tmp_buf__ );                                                                                     \
     } while ( 0 )
 
@@ -107,9 +109,9 @@
 #define LOGW( ... )
 #define LOGE( ... )                                                                                                    \
     do {                                                                                                               \
-        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00};                                                              \
+        char xlog_tmp_buf__[ XLOG_BUFFER_SIZE ] = {0x00}; auto nowstr = my_nowtime2str();                                                             \
         snprintf( xlog_tmp_buf__, sizeof( xlog_tmp_buf__ ), ##__VA_ARGS__ );                                           \
-        fprintf( stderr, "[%s] [E] %s::%s() %d|%s\n", SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
+        fprintf( stderr, "%s %s [E] %s::%s() %d|%s\n",nowstr.c_str(), SPDLOG_TAG, SPDLOG_FILENAME, __FUNCTION__, __LINE__,             \
                  xlog_tmp_buf__ );                                                                                     \
     } while ( 0 )
 #endif

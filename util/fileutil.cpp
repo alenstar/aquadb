@@ -54,6 +54,7 @@
 #define DIR_SEP "/"
 #define DIR_SEP_CHR '/'
 
+namespace util {
 // This namespace has various generic functions related to files and paths.
 // The code still needs a ton of cleanup.
 // REMEMBER: strdup considered harmful!
@@ -341,7 +342,7 @@ bool CreateEmptyFile(const std::string &filename)
 {
     LOGI("CreateEmptyFile: %s", filename.c_str());
 
-    if (!Streams::FileStream(filename, Streams::Stream::AccessMode::READ_WRITE)
+    if (!FileStream(filename, IOStream::AccessMode::READ_WRITE)
              .good()) {
         LOGE("CreateEmptyFile: failed %s: %s", filename.c_str(),
              LastStrerrorString().c_str());
@@ -636,14 +637,14 @@ std::string GetExeDirectory()
 
 bool WriteStringToFile(const std::string &str, const std::string &filename)
 {
-    return Streams::FileStream(filename,
-                               Streams::Stream::AccessMode::READ_WRITE)
+    return FileStream(filename,
+                               IOStream::AccessMode::READ_WRITE)
         .write(str.data(), str.size());
 }
 
 bool ReadFileToString(const std::string &filename, std::string &str)
 {
-    Streams::FileStream file(filename, Streams::Stream::AccessMode::READ_WRITE);
+    FileStream file(filename, IOStream::AccessMode::READ_WRITE);
 
     if (!file.good()) return false;
 
@@ -651,4 +652,16 @@ bool ReadFileToString(const std::string &filename, std::string &str)
     return file.read(&str[0], str.size());
 }
 
+bool ReadFileToBytes(const std::string &filename, std::vector<uint8_t>& bytes)
+{
+    FileStream file(filename, IOStream::AccessMode::READ_WRITE);
+
+    if (!file.good()) return false;
+
+    bytes.resize(file.size());
+    return file.read(&(bytes[0]), bytes.size());
+}
+
+
 } // namespace File
+} // namespace util

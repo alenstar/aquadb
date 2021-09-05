@@ -3,6 +3,7 @@
 #include <memory>
 #include "util/common.h"
 #include "util/logdef.h"
+#include "util/datetime.h"
 #include "nlohmann/json.hpp"
 
 typedef std::string Symbol;
@@ -573,60 +574,25 @@ class CerebroKlineRecord
     }
 };
 
-class CerebroTime;
-
 // 日历对象
 class CerebroCalendar
 {
   public:
     CerebroCalendar();
-    bool is_trading(CerebroTime *t);
+    int init(const std::vector<int>& trading_date);
+    bool is_trading(int dt);
+    bool is_trading(util::DateTime dt);
 
   private:
     std::vector<int> _days;
     std::vector<std::pair<int, int>> _time_ranges; // 交易时间范围
 };
 
-// 时间对象
-class CerebroTime final
-{
-  public:
-    CerebroTime(int dt);
-    CerebroTime(const CerebroTime &ct);
-    int64_t ts() const;
-    int time() const; // 返回时间对象
-    CerebroTime &add_seconds(int n);
-    CerebroTime &add_minute(int n);
-    CerebroTime &add_days(int n);
-
-    bool is_trading(CerebroCalendar *cal);
-    CerebroTime next_timepoint(CerebroCalendar *cal, int offset = 0);
-    CerebroTime next_date(CerebroCalendar *cal, int offset = 0);
-
-  private:
-    int _time; // 时间
-};
-
-class CerebroDate final
-{
-  public:
-    CerebroDate(int dt);
-    CerebroDate(const CerebroDate &ct);
-    int64_t ts() const;
-    int time() const; // 返回时间对象
-    CerebroDate &add_days(int n);
-
-    bool is_trading(CerebroCalendar *cal);
-    CerebroDate next_date(CerebroCalendar *cal, int offset = 0);
-
-  private:
-    int _time; // 时间
-};
-
 
 struct CerebroSeriesValue
 {
-    int date;
+    int date; // 交易日，报告期等
+    int pub_date; // 发布日期(仅财务报表存在)
     double value;
 };
 struct CerebroSectionValue
@@ -638,8 +604,10 @@ struct CerebroSectionValue
 // 区间组合， 用于成份股调入调出， ST或者停复牌
 struct CerebroComponent
 {
-    std::vector<std::pair<int,int>> component; // [start_date, end_date] 闭区间组合
-    const std::pair<int,int>* contain(int date) const; // 日期在组合内
+    // std::vector<std::pair<int,int>> component; // [start_date, end_date] 闭区间组合
+    int in_date;
+    int out_date;
+    bool contain(int date) const; // 日期在组合内
 };
 
 
@@ -659,8 +627,14 @@ struct CerebroConfig
   STRATEGY_RUN_TYPE rtype = STRATEGY_RUN_TYPE::BACKTEST;
 };
 
+enum class FILLING_PROCESS_MODE {
+  NONE = 0, 
+  FILLING_ZERO = 1, // nan
+  FILLING_NAN = 3, // nan
+  FILLING_PREV = 4
+};
+
 // 数据推送
-// 订阅时间点，按时间点取数据并推送
 // 并提供获取数据的接口
 class CerebroDataFeed
 {
@@ -670,9 +644,11 @@ class CerebroDataFeed
     int get_kline(const Symbol &symbol, int date, CerebroKlineRecord &record);
     int get_tick(const Symbol &symbol, int date, CerebroTickRecord &record);
     // 获取数据序列
-    int get_data_series(const Symbol &symbol, int date, int num, const std::string& fields, std::map<std::string, CerebroSeriesValue>& values);
+    int get_data_series(const std::vector<Symbol> &symbols, int date, const std::string& fieldname, std::map<Symbol, CerebroSeriesValue>& values);
+    int get_data_series_by_num(const std::vector<Symbol> &symbols, int date, int num, const std::string& fieldname, std::map<Symbol, std::vector<CerebroSeriesValue>>& values);
+    int get_data_series_by_range(const std::vector<Symbol> &symbols, int start_date, int end_date, const std::string& fieldname, std::map<Symbol, std::vector<CerebroSeriesValue>>& values);
     // 获取数据截面
-    int get_data_section(const std::vector<Symbol>& symbols, int date, const std::string& fields, std::map<std::string, CerebroSectionValue>& values);
+    int get_data_section(const std::vector<Symbol>& symbols, int date, const std::vector<std::string>& fields, std::map<std::string, CerebroSectionValue>& values);
     // 获取数据表
     int get_data_table(const Symbol& symbols, int date, int num, const std::string& tblname);
     // 获取成份数据
@@ -683,9 +659,29 @@ class CerebroDataFeed
     // 判断停牌
     bool is_stop( const Symbol &symbol, int date) const;
 
-    // 接受时间点事件
-    int on_timepoint();
+    // 填充数据序列
+    int filling_data_series( const std::vector<int>& days, std::vector<CerebroSeriesValue>& values, FILLING_PROCESS_MODE mode);
+
 };
+
+// 分析订单，实时计算收益等指标
+class CerebroAnalyzer
+{
+  public:
+  CerebroAnalyzer() = default;
+    virtual ~CerebroAnalyzer();
+    // 计算收益
+    virtual void on_tick(CerebroBroker* broker, CerebroTickRecord* tick) = 0;  
+    // 实时更新订单，计算收益
+    virtual void on_order_update(CerebroBroker* broker,const CerebroOrder* order) = 0;
+    // 结算后调用，用于处理结算后收益相关计算
+    virtual void on_settle(CerebroBroker* broker) = 0;  
+    const std::string& name() const { return name_;}
+    void set_name(const std::string& n) { name_ = n;}
+    protected:
+    std::string name_;
+};
+typedef std::shared_ptr<CerebroAnalyzer> CerebroAnalyzerPtr;
 
 class CerebroStrategy
 {
@@ -703,11 +699,24 @@ class CerebroStrategy
     virtual void on_order_update(CerebroBroker* broker,const CerebroOrder* order) = 0;
 
     const std::string& name() const { return name_;}
+    void set_name(const std::string& n) { name_ = n;}
+
+    // TODO
+    // get history data
+    // get realtime data
+    // get quote data
+    // get factor data
+    // get other data
+
+    // Multi-factor stock selection
+    int stock_picking(const std::string& expr, std::vector<Symbol>& symbols);
     protected:
     std::string name_;
 };
 typedef std::shared_ptr<CerebroStrategy> CerebroStrategyPtr;
 
+
+#if 0
 class CerebroEvent
 {
   public:
@@ -856,3 +865,4 @@ class CerebroEngine
     CerebroEventSink *_sink{nullptr};     // 消费事件
     CerebroBroker *_broker{nullptr};      // 订单管理撮合, 持仓管理，帐号管理
 };
+#endif

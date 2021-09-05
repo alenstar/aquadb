@@ -1,13 +1,13 @@
 #pragma once
-#include "stream.h"
-namespace Streams {
+#include "iostream.h"
+namespace util {
 
-class MemoryStream : public Stream {
+class MemoryStream : public IOStream {
   public:
     enum class DeleteMode { None, DeleteOnDestruct };
 
     MemoryStream( DeleteMode delete_mode = DeleteMode::DeleteOnDestruct, int access_mode = AccessMode::READ_WRITE );
-    MemoryStream( BufferPtr buffer, int access_mode = AccessMode::READ_WRITE );
+    MemoryStream( IOBufferPtr buffer, int access_mode = AccessMode::READ_WRITE );
     MemoryStream( void *buffer, size_t size, DeleteMode delete_mode = DeleteMode::DeleteOnDestruct,
                   int access_mode = AccessMode::READ_WRITE );
     virtual ~MemoryStream() override;
@@ -28,17 +28,16 @@ class MemoryStream : public Stream {
 
     virtual bool good() override;
 
-    virtual BufferPtr get_as_buffer() override;
+    virtual IOBufferPtr get_as_buffer() override;
 
   protected:
-    BufferPtr  m_buffer;
+    IOBufferPtr  m_buffer;
     DeleteMode m_delete_mode;
 
     size_t m_buffer_offset;
 };
 
 typedef std::shared_ptr<MemoryStream> MemoryStreamPtr;
-#define AeonEmptyMemoryStream MemoryStreamPtr;
 
-} /* namespace Streams */
+} /* namespace util */
 

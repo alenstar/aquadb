@@ -151,11 +151,12 @@ int RaftLogStore::scan_range(uint64_t start_index, uint64_t end_index,
     rocksdb::Slice k(stkey.data(), stkey.size());
     rocksdb::Slice endk(edkey.data(), edkey.size());
     auto cursor = wrapper_->seek_for_next( wrapper_->get_raft_log_handle(), k, false);
-    for (;;)
+    for (;cursor->Valid();)
     {
-        if (!cursor->Valid())
+        auto status = cursor->status();
+        if(!status.ok())
         {
-            continue;
+            break;
         }
         auto k = cursor->key();
         if (k.compare(edk) > 0)

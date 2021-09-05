@@ -2,7 +2,7 @@
 #include "util/logdef.h"
 
 #undef SPDLOG_TAG
-#define SPDLOG_TAG "RAFT"
+#define SPDLOG_TAG "[RAFT]"
 
 #ifdef _WIN32
 #define SHORT_FILENAME(fn) ( strrchr( fn, '\\' ) ? strrchr( fn, '\\' ) + 1 : fn)
@@ -27,23 +27,23 @@
      *    Fatal:    1
      * 
      *******/
-
+    auto nowstr = my_nowtime2str();
     switch (level)
     {
     case 1:
     case 2:
-        fprintf( stderr, "[%s] [E] %s::%s() %lu|%s\n", SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
+        fprintf( stderr, "%s %s [E] %s::%s() %lu|%s\n", nowstr.c_str(), SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
         break;
     case 3:
-        fprintf( stderr, "[%s] [W] %s::%s() %lu|%s\n", SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
+        fprintf( stderr, "%s %s [W] %s::%s() %lu|%s\n",nowstr.c_str(),  SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
         break;
     case 4:
-        fprintf( stderr, "[%s] [I] %s::%s() %lu|%s\n", SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
+        fprintf( stderr, "%s %s [I] %s::%s() %lu|%s\n",nowstr.c_str(),  SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
         break;
     case 5:
     case 6:
     default:
-        fprintf( stderr, "[%s] [D] %s::%s() %lu|%s\n", SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
+        fprintf( stderr, "%s %s [D] %s::%s() %lu|%s\n",nowstr.c_str(),  SPDLOG_TAG, SHORT_FILENAME(source_file), func_name, line_number, msg.c_str());   
         break;
     }
     }

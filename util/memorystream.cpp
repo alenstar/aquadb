@@ -2,72 +2,61 @@
 #include <memory>
 #include <string.h>
 #include <string>
-
-#include "buffer.h"
+#include "logdef.h"
+#include "iobuffer.h"
 #include "memorystream.h"
-#include "stream.h"
 
-namespace Streams {
+#undef SPDLOG_TAG 
+#define SPDLOG_TAG "[util]"
+namespace util {
 
 MemoryStream::MemoryStream( DeleteMode delete_mode /*= DeleteMode::DeleteOnDestruct*/,
                             int        access_mode /*= AccessMode::READ_WRITE*/ )
-    : Stream( access_mode )
-    , m_buffer( std::make_shared<Buffer>() )
+    : IOStream( access_mode )
+    , m_buffer( std::make_shared<IOBuffer>() )
     , m_buffer_offset( 0 ) {
     // Set the correct delete mode in our buffer
-    m_buffer->set_delete_mode( delete_mode == DeleteMode::DeleteOnDestruct ? Buffer::DeleteMode::DeleteOnDestruct
-                                                                           : Buffer::DeleteMode::None );
+    m_buffer->set_delete_mode( delete_mode == DeleteMode::DeleteOnDestruct ? IOBuffer::DeleteMode::DeleteOnDestruct
+                                                                           : IOBuffer::DeleteMode::None );
 }
 
-MemoryStream::MemoryStream( BufferPtr buffer, int access_mode /*= AccessMode::READ_WRITE*/ )
-    : Stream( access_mode )
+MemoryStream::MemoryStream( IOBufferPtr buffer, int access_mode /*= AccessMode::READ_WRITE*/ )
+    : IOStream( access_mode )
     , m_buffer( buffer )
     , m_buffer_offset( 0 ) {}
 
 MemoryStream::MemoryStream( void *buffer, size_t size, DeleteMode delete_mode /*= DeleteMode::DeleteOnDestruct*/,
                             int access_mode /*= AccessMode::READ_WRITE*/ )
-    : Stream( access_mode )
-    , m_buffer( std::make_shared<Buffer>( buffer, size ) )
+    : IOStream( access_mode )
+    , m_buffer( std::make_shared<IOBuffer>( buffer, size ) )
     , m_buffer_offset( 0 ) {
     // Set the correct delete mode in our buffer
-    m_buffer->set_delete_mode( delete_mode == DeleteMode::DeleteOnDestruct ? Buffer::DeleteMode::DeleteOnDestruct
-                                                                           : Buffer::DeleteMode::None );
+    m_buffer->set_delete_mode( delete_mode == DeleteMode::DeleteOnDestruct ? IOBuffer::DeleteMode::DeleteOnDestruct
+                                                                           : IOBuffer::DeleteMode::None );
 }
 
 MemoryStream::~MemoryStream() { close(); }
 
 size_t MemoryStream::read( void *buffer, size_t count ) {
     if ( !( m_access_mode & AccessMode::READ ) ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: Read on write-only stream." );
-#endif
-
+        LOGE( "MemoryStream: Read on write-only stream." );
         return 0;
     }
 
     char *data = (char *) m_buffer->get();
 
     if ( !data ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: Read on empty stream. Buffer was NULL." );
-#endif
-
+        LOGE( "MemoryStream: Read on empty stream. Buffer was NULL." );
         return 0;
     }
 
     if ( !buffer ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: Input buffer is NULL." );
-#endif
-
+        LOGE( "MemoryStream: Input buffer is NULL." );
         return 0;
     }
 
     if ( count == 0 ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::warning( "MemoryStream: Tried writing 0 bytes." );
-#endif
-
+        LOGW( "MemoryStream: Tried writing 0 bytes." );
         return 0;
     }
 
@@ -85,19 +74,13 @@ size_t MemoryStream::read( void *buffer, size_t count ) {
 
 size_t MemoryStream::write( const void *buffer, size_t count ) {
     if ( !( m_access_mode & AccessMode::WRITE ) ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: WRITE on write-only stream." );
-#endif
-
+        LOGE( "MemoryStream: WRITE on write-only stream." );
         return 0;
     }
 
     // Make sure we have enough space in the buffer
     if ( !m_buffer->reserve( m_buffer_offset + count ) ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: WRITE on stream failed. Could not reserve memory." );
-#endif
-
+        LOGE( "MemoryStream: WRITE on stream failed. Could not reserve memory." );
         return 0;
     }
 
@@ -112,26 +95,20 @@ size_t MemoryStream::write( const void *buffer, size_t count ) {
 
 size_t MemoryStream::read_line( std::string &str ) {
     if ( !( m_access_mode & AccessMode::READ ) ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: Read on write-only stream." );
-#endif
-
+        LOGE( "MemoryStream: Read on write-only stream." );
         return 0;
     }
 
     char *data = (char *) m_buffer->get();
 
     if ( data == NULL ) {
-#ifdef AEON_USE_AEON_CONSOLE_LIBRARY
-        Console::error( "MemoryStream: Read on empty stream. Buffer was NULL." );
-#endif
-
+        LOGE( "MemoryStream: Read on empty stream. Buffer was NULL." );
         return 0;
     }
 
     std::string line;
     size_t      character_offset = 0;
-    for ( int i = 0; i < AEON_STREAMS_MAX_TEXT_LINE_LENGTH; ++i ) {
+    for ( int i = 0; i < IOSTREAM_MAX_TEXT_LINE_LENGTH; ++i ) {
         // Can we still read a character?
         if ( m_buffer_offset + character_offset >= m_buffer->size() ) break;
 
@@ -178,7 +155,7 @@ bool MemoryStream::eof() const { return m_buffer_offset >= m_buffer->size(); }
 void MemoryStream::close() {
     // Create a new buffer, and remove all references to the old one.
     // This may leak memory if DeleteOnDestruct was not set.
-    m_buffer = std::make_shared<Buffer>();
+    m_buffer = std::make_shared<IOBuffer>();
 }
 
 void MemoryStream::flush() {
@@ -196,6 +173,8 @@ bool MemoryStream::good() {
     return true;
 }
 
-BufferPtr MemoryStream::get_as_buffer() { return m_buffer; }
+IOBufferPtr MemoryStream::get_as_buffer() { return m_buffer; }
 
-} /* namespace Streams */
+} /* namespace util */
+
+#undef SPDLOG_TAG 

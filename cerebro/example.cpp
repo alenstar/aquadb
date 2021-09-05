@@ -1,48 +1,111 @@
-#include <iostream>
-#include <chrono>
-#include "cerebro_struct.h"
-#include "cerebro_broker.h"
-#include "cerebro_trader.h"
 #include "cerebro_backtest.h"
+#include "cerebro_broker.h"
+#include "cerebro_struct.h"
+#include "cerebro_trader.h"
 #include "sina_api.h"
 #include "tencent_api.h"
+#include "duckdb.hpp"
+#include <chrono>
+#include <iostream>
 INITIALIZE_EASYLOGGINGPP
 
-class MyStrategy:public CerebroStrategy
+class MyQuoteProvider : public CerebroQuoteProvider
 {
-    public:
-    MyStrategy () {name_= "MyStrategy";}
-    ~MyStrategy() override {}
-    void on_market_open(CerebroBroker* broker, int dt) override {
-        LOGD("dt=%d",dt);
-    }
-    void on_pre_market_open(CerebroBroker* broker, int dt) override {
-        LOGD("dt=%d",dt);
-    }
-    void on_market_close(CerebroBroker* broker, int dt) override {
-        LOGD("dt=%d",dt);
-    }
-    void on_aft_market_close(CerebroBroker* broker, int dt) override {
-        LOGD("dt=%d",dt);
-    }
-    void on_tick(CerebroBroker* broker, CerebroTickRecord* tick) override   // 加载tick缓存， 触发用户业务回调on_tick，再触发broker撮合
+  public:
+    MyQuoteProvider(duckdb::Connection* conn):conn_(conn) {} 
+    ~MyQuoteProvider() override {}
+    int get_daily_kline(int dt, std::vector<CerebroKlineRecord> &records) override
     {
-        LOGD("symbol=%s", tick->symbol.c_str());
+        // TODO
+        return -1;
     }
-    void on_kline(CerebroBroker* broker, CerebroKlineRecord* kline) override // 根据时间点加载k线缓存，再处理用户业务回调on_kline
+    int get_daily_kline_by_range(const Symbol &symbol, int start_dt, int end_dt,
+                                 std::vector<CerebroKlineRecord> &records) override
     {
-        LOGD("symbol=%s", kline->symbol.c_str());
+        // TODO
+        return -1;
     }
-    void on_order_update(CerebroBroker* broker,const CerebroOrder* order) override {
-        LOGD("symbol=%s,%f,%f, %d", order->symbol.c_str(), order->price, order->quantity, static_cast<int>(order->status));
+    int get_daily_kline_by_num(const Symbol &symbol, int end_dt, int num,
+                               std::vector<CerebroKlineRecord> &records) override
+    {
+        // TODO
+        return -1;
+    }
+    int get_minute_kline(const Symbol &symbol, int dt, int span, std::vector<CerebroKlineRecord> &records) override
+    {
+        // TODO
+        return -1;
+    }
+    int get_minute_kline_by_timestop(int64_t timestop, int span, std::vector<CerebroKlineRecord> &records) override
+    {
+        // TODO
+        return -1;
+    }
+
+    int preload(int start_dt, int end_dt)
+    {
+        // TODO
+        return -1;
+    }
+
+  private:
+    std::unordered_map<Symbol, std::vector<CerebroKlineRecord>> records_;
+    duckdb::Connection* conn_{nullptr};
+};
+
+class MyAnalyzer : public CerebroAnalyzer
+{
+  public:
+    MyAnalyzer()  { name_ = "MyAnalyzer"; }
+    ~MyAnalyzer() override {}
+    void on_tick(CerebroBroker *broker, CerebroTickRecord *tick) override
+    {
+        // 计算实时收益
+    }
+    void on_order_update(CerebroBroker *broker, const CerebroOrder *order) override
+    {
+        // 计算平仓胜率
+    }
+    void on_settle(CerebroBroker* broker) 
+    {
+        // 计算结算后的收益率
     }
 
 };
 
-int main(int argc ,char* argv[])
+class MyStrategy : public CerebroStrategy
 {
-    int rc =0 ;
-    
+  public:
+    MyStrategy() { name_ = "MyStrategy"; }
+    ~MyStrategy() override {}
+    void on_market_open(CerebroBroker *broker, int dt) override { LOGD("dt=%d", dt); }
+    void on_pre_market_open(CerebroBroker *broker, int dt) override { LOGD("dt=%d", dt); }
+    void on_market_close(CerebroBroker *broker, int dt) override { LOGD("dt=%d", dt); }
+    void on_aft_market_close(CerebroBroker *broker, int dt) override { LOGD("dt=%d", dt); }
+    void on_tick(CerebroBroker *broker,
+                 CerebroTickRecord *tick) override // 加载tick缓存， 触发用户业务回调on_tick，再触发broker撮合
+    {
+        LOGD("symbol=%s", tick->symbol.c_str());
+    }
+    void on_kline(CerebroBroker *broker,
+                  CerebroKlineRecord *kline) override // 根据时间点加载k线缓存，再处理用户业务回调on_kline
+    {
+        LOGD("symbol=%s", kline->symbol.c_str());
+    }
+    void on_order_update(CerebroBroker *broker, const CerebroOrder *order) override
+    {
+        LOGD("symbol=%s,%f,%f, %d", order->symbol.c_str(), order->price, order->quantity,
+             static_cast<int>(order->status));
+    }
+};
+
+int main(int argc, char *argv[])
+{
+    int rc = 0;
+	duckdb::DuckDB db(nullptr);
+	duckdb::Connection conn(db);
+
+    /*
     std::vector<std::string> codes;//{"sz000001","sh600001","sh688681","sh688680"};
     mdlink_api::MarketDataProvider mdlink;
     mdlink.init(8);
@@ -54,9 +117,10 @@ int main(int argc ,char* argv[])
     std::cout << "codes.size=" << mdlink.get_codes().size() << std::endl;
     mdlink.update_quotes();
     // mdlink.wait_for_shutdown();
+    */
 
+    // 初始化回测模块
     // backtesting
-    // TODO
     CerebroConfig config;
     config.cash = 1000000;
     config.qtype = QUOTES_TYPE::DAY;
@@ -67,19 +131,31 @@ int main(int argc ,char* argv[])
     config.end_date = 20210801;
     CerebroBacktest bt;
     rc = bt.init(config);
-    if(rc != 0)
+    if (rc != 0)
     {
         LOGE("backtest init fail, rc=%d", rc);
         return 1;
     }
-    auto strategy = std::make_shared<MyStrategy>();
-    bt.add_strategy(strategy);
-    rc = bt.run();
-    if(rc != 0)
+
+    // 加载行情数据
+    MyQuoteProvider myquote(&conn);
+    myquote.preload(config.start_date, config.end_date);
+
+    // 添加策略
+    MyStrategy strategy;
+    bt.add_strategy(&strategy);
+
+    // 添加分析器
+    MyAnalyzer analyzer;
+    bt.add_analyzer(&analyzer);
+
+    // 运行回测
+    rc = bt.run(&myquote);
+    if (rc != 0)
     {
         LOGE("backtest reutrn_code: %d", rc);
         return 2;
     }
-    //std::this_thread::sleep_for(std::chrono::seconds(3));
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
     return 0;
 }

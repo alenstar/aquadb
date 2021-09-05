@@ -1,6 +1,6 @@
 #include "cerebro_backtest.h"
 #include "cerebro_broker.h"
-#include "cerebro_recorder.h"
+#include "cerebro_quote.h"
 #include "util/datetime.h"
 
 CerebroBacktest::CerebroBacktest() { broker_ = new CerebroBroker(); }
@@ -27,10 +27,21 @@ int CerebroBacktest::init(const CerebroConfig &conf)
     conf_ = conf;
     // 设置订单更新回调
     broker_->set_order_update_callback([this](const CerebroOrder &o) {
+        // 策略回调
         for (auto &st : strategys_) {
             // FIXME
             // 可根据订单中的扩展字段找到对于的下单策略
             st.second->on_order_update(broker_, &o);
+        }
+        if(o.status != ORDER_STATUS::FILLED)
+        {
+            return;
+        }
+        // 分析器回调
+        for (auto &an : analyzers_) {
+            // FIXME
+            // 实时计算策略指标
+            an.second->on_order_update(broker_, &o);
         }
     });
     last_order_id_ = 1000000;
@@ -48,20 +59,21 @@ int CerebroBacktest::init(const CerebroConfig &conf)
     broker_->set_matcher("SZ", new CerebroSZSEMatcher(broker_));
     return 0;
 }
-int CerebroBacktest::run()
+int CerebroBacktest::run(CerebroQuoteProvider* provider)
 {
     CerebroKlineRecord kline;
     std::unordered_map<Symbol, CerebroTickRecordPtr> quotes;
     CerebroQuotePlayer player;
-    player.init(conf_.qtype, nullptr);
+    player.init(conf_.qtype, provider);
     util::DateTime start_dt(static_cast<util::DateTime::DateType>(conf_.start_date));
-    util::DateTime end_dt(static_cast<util::DateTime::DateType>(conf_.start_date));
+    util::DateTime end_dt(static_cast<util::DateTime::DateType>(conf_.end_date));
 
     for (auto dt = start_dt; dt <= end_dt; dt.add_days(1)) {
         // TODO
         // 跳过非交易日
-        for (auto &st : strategys_) {
-            st.second->on_pre_market_open(broker_, static_cast<int>(dt.date()));
+        if(dt.is_weekend())
+        {
+            continue;
         }
         // TODO
         int rc = player.seek_to(static_cast<int>(dt.date()));
@@ -71,11 +83,16 @@ int CerebroBacktest::run()
         }
 
         for (auto &st : strategys_) {
+            st.second->on_pre_market_open(broker_, static_cast<int>(dt.date()));
+        }
+
+        for (auto &st : strategys_) {
             st.second->on_market_open(broker_, static_cast<int>(dt.date()));
         }
 
-        CerebroTickRecordPtr quote;
+        CerebroTickRecord* quote = nullptr;
         while (quote = player.next()) {
+            // 策略回调
             for (auto &st : strategys_) {
                 if (conf_.qtype != QUOTES_TYPE::TICK) {
                     CerebroQuotePlayer::tick_to_kline(*quote, kline);
@@ -83,12 +100,20 @@ int CerebroBacktest::run()
                 }
                 else {
                     // tick to kline
-                    st.second->on_tick(broker_, quote.get());
+                    st.second->on_tick(broker_, quote);
                 }
             }
 
+            // broker 回调，处理订单
             // 可考虑多线程执行
             broker_->on_tick(*quote);
+
+            // 分析器回调
+            // 更新收益等
+            for(auto& an: analyzers_)
+            {
+                an.second->on_tick(broker_, quote);
+            }
         }
 
         // 收盘
@@ -104,10 +129,18 @@ int CerebroBacktest::run()
         } else {
             broker_->settle(records);
         }
+
+            // 分析器回调
+            // 更新收益等
+            for(auto& an: analyzers_)
+            {
+                an.second->on_settle(broker_);
+            }
+
         //收盘后
-        for (auto &st : strategys_) {
-            st.second->on_aft_market_close(broker_,  static_cast<int>(dt.date()));
-        }
+        //for (auto &st : strategys_) {
+        //    st.second->on_aft_market_close(broker_,  static_cast<int>(dt.date()));
+        //}
     }
     return 0;
 }
