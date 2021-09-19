@@ -18,6 +18,8 @@
  */
 
 #include "common.h"
+#include <unistd.h>
+#include <sys/time.h>
 
 
 namespace util {
@@ -160,6 +162,14 @@ std::string tm2str(const time_t &t, const std::string &sFormat)
 
     return tm2str(tt, sFormat);
 }
+
+int tm2dateint(const time_t &t)
+{
+    struct tm tt;
+    localtime_r(&t, &tt);
+    return (tt.tm_year + 1900) * 10000L + (tt.tm_mon + 1) * 100L + tt.tm_mday;
+}
+
 
 std::string now2str(const std::string &sFormat)
 {

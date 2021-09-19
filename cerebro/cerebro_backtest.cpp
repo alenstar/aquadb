@@ -71,27 +71,41 @@ int CerebroBacktest::run(CerebroQuoteProvider* provider)
     for (auto dt = start_dt; dt <= end_dt; dt.add_days(1)) {
         // TODO
         // 跳过非交易日
-        if(dt.is_weekend())
+        if(dt.is_weekend() || (!provider->is_trading_day(static_cast<int>(dt.date()))))
         {
             continue;
         }
-        // TODO
+        LOGD("on trading_day:%d", dt.date());
+
+        // 定位k线数据
         int rc = player.seek_to(static_cast<int>(dt.date()));
         if (rc != 0) {
             LOGE("not found quotes: trading_date=%d", dt.date());
             continue;
         }
 
+        // 更新交易日
+        broker_->set_date(static_cast<int>(dt.date()));
+        // 开盘前
         for (auto &st : strategys_) {
             st.second->on_pre_market_open(broker_, static_cast<int>(dt.date()));
         }
 
+        // 处理分红，转换分红数据到分红订单
+        auto trackers = broker_->get_all_tracker();
+        for (auto t: trackers)
+        {
+            process_dividend(provider, t->symbol(), static_cast<int>(dt.date()));
+        }
+
+        // 开盘
         for (auto &st : strategys_) {
             st.second->on_market_open(broker_, static_cast<int>(dt.date()));
         }
 
+        // 回放行情
         CerebroTickRecord* quote = nullptr;
-        while (quote = player.next()) {
+        while ((quote = player.next())) {
             // 策略回调
             for (auto &st : strategys_) {
                 if (conf_.qtype != QUOTES_TYPE::TICK) {
@@ -123,7 +137,7 @@ int CerebroBacktest::run(CerebroQuoteProvider* provider)
 
         // 盘后结算
         std::vector<CerebroKlineRecord> records;
-        rc = player.get_daily_kline( static_cast<int>(dt.date()), records);
+        rc = provider->get_daily_kline( static_cast<int>(dt.date()), records);
         if(rc != 0) {
             LOGE("get daily kline fail, dt=%d",  static_cast<int>(dt.date()));
         } else {
@@ -143,4 +157,27 @@ int CerebroBacktest::run(CerebroQuoteProvider* provider)
         //}
     }
     return 0;
+}
+
+
+void CerebroBacktest::process_dividend(CerebroQuoteProvider* provider, const Symbol& symbol, int dt)
+{
+    // TODO
+    CerebroDividend dividend;
+    int rc = provider->get_dividend(symbol, dt, dividend);
+    if(rc != 0)
+    {
+        // not found dividend
+        return;
+    }
+    // 分红委托单
+    auto lt = broker_->get_long_tracker(symbol);
+    if(lt == nullptr)
+    {
+        return;
+    }
+    // 计算有多少分红份额
+    int num = static_cast<int>(lt->current_position().quantity / dividend.round_lot);
+    LOGD("dividend %s:%d num=%d share=%f cash=%f", symbol.c_str(), dt, num, dividend.dividend_share,dividend.dividend_cash);
+    broker_->dividend_order(symbol, dividend.dividend_share * num, dividend.dividend_cash * num);
 }

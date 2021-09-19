@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #define my_msleep( M ) usleep( 1000 * ( M ) )
 #define my_min( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )

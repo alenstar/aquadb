@@ -12,6 +12,11 @@ class CerebroQuoteProvider
                                        std::vector<CerebroKlineRecord> &records) = 0;
     virtual int get_minute_kline(const Symbol &symbol, int dt, int span, std::vector<CerebroKlineRecord> &records) = 0;
     virtual int get_minute_kline_by_timestop(int64_t timestop, int span, std::vector<CerebroKlineRecord> &records) = 0;
+    virtual bool is_trading_day(int dt) = 0;
+    virtual int get_dividend(const Symbol &symbol, int dt,CerebroDividend& dividend) = 0;
+
+    // 获取最新tick
+    virtual int get_last_tick(int dt, std::vector<CerebroTickRecord> &records) = 0;
     // virtual int next_tick() = 0;
 };
 typedef std::shared_ptr<CerebroQuoteProvider> CerebroQuoteProviderPtr;
@@ -53,15 +58,15 @@ class CerebroQuotePlayer
         current_dt_ = dt;
         pos_ = -1;
         records_.clear();
-        return -1;
+        return 0;
     }
     CerebroTickRecord *next();
 
-    int get_daily_kline(int dt, std::vector<CerebroKlineRecord> &records)
-    {
-        // TODO
-        return -1;
-    }
+    //int get_daily_kline(int dt, std::vector<CerebroKlineRecord> &records)
+    //{
+    //    // TODO
+    //    return -1;
+    //}
     static void tick_to_kline(const CerebroTickRecord &t, CerebroKlineRecord &k);
     static void kline_to_tick(const CerebroKlineRecord &k, CerebroTickRecord &t);
 

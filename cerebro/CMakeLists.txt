@@ -25,11 +25,11 @@ set(LIB_SRC cerebro_broker.cpp cerebro_struct.cpp cerebro_trader.cpp cerebro_quo
             )
 
 add_library(${LIB_NAME} ${LIB_SRC} ${LIB_INC})
-add_dependencies(${LIB_NAME} util arrow)
+add_dependencies(${LIB_NAME} util)
 
 set(APP_NAME cerebro_example)
 add_executable(${APP_NAME} example.cpp)
-target_link_libraries(${APP_NAME} ${LIB_NAME} util arrow duckdb ${SYS_LIBS} ${MYSQL_LIBRARIES})
+target_link_libraries(${APP_NAME} ${LIB_NAME} util ${ARROW_LIBRARIES} ${GFLAGS_LIBRARIES} ${SNAPPY_LIBRARIES} ${LZ4_LIBRARIES} ${ZLIB_LIBRARIES} ${SYS_LIBS} ${MYSQL_LIBRARIES})
 #message("LINK: ${SYS_LIBS}")
 
 #target_include_directories(${APP_NAME} PUBLIC ../src)

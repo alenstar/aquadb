@@ -65,14 +65,12 @@ struct CrtDebugBreak {
 #include <stdlib.h>
 
 #include <time.h>
-#include <unistd.h>
 
 #include <errno.h>
 #include <fcntl.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/time.h>
 
 #include <cmath>
 #include <cstring>
@@ -161,6 +159,19 @@ inline absl::Time FromDateInt(int dt, bool utc=false)
     return absl::FromCivil(absl::CivilDay(y,m, d), utc ? absl::UTCTimeZone(): absl::LocalTimeZone());
 }
 */
+
+template<typename T>
+bool almost_zero(T x, double epsilon = 0.000001)
+{
+    T y = 0.0;
+    if (std::is_same<float, T>::value || std::is_same<double, T>::value) {
+    return std::fabs(x-y) <= (epsilon * 0.5);
+    }
+    else {
+        return x == y;
+    }
+}
+
 
 template<typename T>
 bool almost_eq(T x, T y, double epsilon = 0.000001)
@@ -452,6 +463,8 @@ std::string tm2str( const struct tm &stTm, const std::string &sFormat = "%Y%m%d%
  * @return std::string  转换后的时间字符串
  */
 std::string tm2str( const time_t &t, const std::string &sFormat = "%Y%m%d%H%M%S" );
+
+int tm2dateint(const time_t &t);
 
 /**
  * @brief  当前时间转换成紧凑格式字符串

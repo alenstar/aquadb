@@ -70,7 +70,7 @@ int create_tick_table(aquadb::DBManager* mgr, const std::string& dbname, const s
     }
     {
     aquadb::FieldDescriptor vfield;
-    vfield.name = "prev_close";
+    vfield.name = "preclose";
     vfield.id = tbl->next_id();
     vfield.type = aquadb::FieldDescriptor::FieldType::Float64;
     tbl->add_field(vfield);
@@ -98,7 +98,7 @@ int create_tick_table(aquadb::DBManager* mgr, const std::string& dbname, const s
     }
     {
     aquadb::FieldDescriptor vfield;
-    vfield.name = "prev_open_interest";
+    vfield.name = "preopen_interest";
     vfield.id = tbl->next_id();
     vfield.type = aquadb::FieldDescriptor::FieldType::Float64;
     tbl->add_field(vfield);

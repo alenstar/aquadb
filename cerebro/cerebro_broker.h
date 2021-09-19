@@ -3,6 +3,7 @@
 #include <memory>
 #include <functional>
 #include <chrono>
+#include <algorithm> 
 #include "util/common.h"
 #include "util/logdef.h"
 #include "cerebro_struct.h"
@@ -49,6 +50,8 @@ class CerebroAccountWrap
         return (order.filled_price * order.filled_quantity) * _commission_rate;
     }
 
+    inline double units() const { return _account.units;}
+    inline double unit_value() const { return _account.unit_value;}
     // double calc_frozen_cash(const CerebroOrder& order, double last_price = 0.0)
     //{
     //    // 计算需冻结的资金
@@ -180,7 +183,7 @@ class CerebroAccountWrap
     _account.daily_pnl = pnl;
   }
 
-    // 转市场到资金(卖出)
+    // 转市值到资金(卖出)
   int transform_market_value_to_cash(double value, double fee) {
         _account.cash = _account.cash + value - fee;
         _account.transaction_cost += fee;
@@ -233,6 +236,8 @@ class CerebroMatcher
     // int do_order_update(const CerebroOrder& order);
     virtual int market_tplus(const Symbol& symbol) { return 0;}
     virtual double price_unit(const Symbol& symbol) {return 0.01;}
+    bool is_over_limit_up(CerebroOrder &order, const CerebroTickRecord &tick);
+    bool is_over_limit_down(CerebroOrder &order, const CerebroTickRecord &tick);
   protected:
     int process_limit_order(CerebroOrder &order, const CerebroTickRecord &tick);
     int process_market_order(CerebroOrder &order, const CerebroTickRecord &tick);
@@ -279,6 +284,8 @@ class CerebroPositionTracker
     void buy_to_cover(double quantity, double price, double commission = 0.0);
     void sell_short(double quantity, double price, double commission = 0.0);
 
+    const Symbol& symbol() const { return _position.symbol;}
+    POSITION_DIRECTION direction() const { return _position.direction;}
     const CerebroPosition& current_position() { return _position;}
     inline double current_market_value() const { return _position.market_value() + _position.position_pnl;}
     inline double market_value() const { return _position.market_value();}
@@ -295,7 +302,21 @@ class CerebroPositionTracker
        
       // 结算后换日，持仓变可用
       _position.closable = _position.quantity;
+
+      // 填充开仓日期
+      if(_position.open_dt == 0)
+      {
+        _position.open_dt = record.dt;
+      }
+
+      // 平仓日期
+      if(util::almost_zero(_position.quantity))
+      {
+        _position.close_dt = record.dt;
+      }
+
        }
+       bool empty() const { return util::almost_zero(_position.quantity);};
   private:
     CerebroPosition _position; //多 or 空
     int _tplus = 0;
@@ -325,9 +346,9 @@ class CerebroBroker
       return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();;
     }
 
-    int now_date() { return -1;}
+    int now_date() { return _current_dt;}
     // 设置当前交易日(回测时用)
-    void set_date() { }
+    void set_date(int dt) { _current_dt = dt;}
 
     // 添加资金, 卖出，入金，分红 使用此接口
     /**
@@ -408,11 +429,15 @@ class CerebroBroker
     int64_t buy_to_cover(const Symbol &symbol, double quantity, double price = 0.0);
     int64_t sell_short(const Symbol &symbol, double quantity, double price = 0.0);
 
+    // 分红委托
+    int64_t dividend_order(const Symbol &symbol, double quantity, double price);
+
     // 撤单视作特殊的订单, 待撤订单id填写在扩展字段中
     int64_t cancel_order(int64_t order_id);
 
     // 提交订单到队列
     void commit_order(const CerebroOrder &order);
+
 
     // 入金, isfinish = true 用于初始化时初次入金
     int64_t deposit_cash(double cash, bool isfinish = false);
@@ -429,7 +454,7 @@ class CerebroBroker
     double current_positions_pnl();
     inline CerebroAccountWrapPtr current_account() {return _account;}
 
-    CerebroPositionTracker *get_long_tracker(const Symbol &symbol, bool auto_create=true)
+    CerebroPositionTracker *get_long_tracker(const Symbol &symbol, bool auto_create=false)
     {
         auto it = _lpositions.find(symbol);
         if (it != _lpositions.cend())
@@ -445,7 +470,7 @@ class CerebroBroker
         _lpositions.insert(std::make_pair(symbol, p));
         return p;
     }
-    CerebroPositionTracker *get_short_tracker(const Symbol &symbol, bool auto_create=true)
+    CerebroPositionTracker *get_short_tracker(const Symbol &symbol, bool auto_create=false)
     {
         auto it = _spositions.find(symbol);
         if (it != _spositions.cend())
@@ -473,6 +498,27 @@ class CerebroBroker
         }
         return trackers;
     }
+    void remove_tracker(const Symbol& symbol, POSITION_DIRECTION direction)
+    {
+        if(direction == POSITION_DIRECTION::LONG)
+        {
+            auto it = _lpositions.find(symbol);
+            if (it != _lpositions.cend())
+            {
+              return;
+            }
+            _lpositions.erase(it);
+        }
+        else if(direction == POSITION_DIRECTION::SHORT)
+        {
+                      auto it = _spositions.find(symbol);
+            if (it != _spositions.cend())
+            {
+              return;
+            }
+            _spositions.erase(it);
+        }
+    }
 
   protected:
     // 处理特殊订单(订单提交时立即处理)
@@ -486,12 +532,12 @@ class CerebroBroker
       auto lp = _lpositions.find(symbol);
       if(lp != _lpositions.cend())
       {
-        return true;
+        return lp->second->empty() ? false: true;
       }
       auto sp = _spositions.find(symbol);
       if(sp != _spositions.cend())
       {
-        return true;
+        return sp->second->empty() ? false: true;
       }
       return false;
   }
@@ -501,8 +547,9 @@ class CerebroBroker
 
   private:
     double _cash{0};                 // 资金
-    int _slippage{0};             // 滑点
     double _commission_rate{0.0003}; // 手续费
+    int _slippage{0};             // 滑点
+    int _current_dt{-1}; // 当前日期
     CerebroAccountWrapPtr _account{nullptr};
     //std::list<CerebroOrder> _unfill_orders; // 未成订单 
     std::map<Symbol,std::list<CerebroOrder>> _unfill_orders; // 未成订单 

@@ -102,6 +102,23 @@ class MarketDataProvider : public CerebroQuoteProvider
     {
         return -1;
     }
+    int get_last_tick(int dt, std::vector<CerebroTickRecord> &records) override
+    {
+     // for(auto const& q: quotes_)
+     // {}
+        return -1;
+    }
+
+    bool is_trading_day(int dt) override
+    {
+      return true;
+    }
+
+  int get_dividend(const Symbol &symbol, int dt,CerebroDividend& dividend) override
+  {
+    return -1;
+  }
+
   protected:
     MdLinkApiPtr get_mdlink_api();
 

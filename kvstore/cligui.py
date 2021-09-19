@@ -1,23 +1,35 @@
 #!/usr/bin/env python
+import os
+os.environ['HUB_HOME'] = "./modules"
 
 import sys
-import os
+import io
 import pandas as pd
 from PyQt5 import QtCore
 from PyQt5.QtCore import (QAbstractItemModel, QModelIndex, Qt, QAbstractListModel, QMimeData,
     QDataStream, QByteArray, QJsonDocument, QVariant, QJsonValue, QJsonParseError)
 from PyQt5.QtWidgets import (
-    QMainWindow, QApplication, QWidget, QAction, 
+    QMainWindow, QApplication, QSpinBox, QWidget, QAction, 
     QTableView, QTableWidget,QTableWidgetItem,QVBoxLayout,QHBoxLayout,
     QPushButton,QLabel,QComboBox,QLineEdit,QMessageBox,
     QTabWidget,QTextEdit,QPlainTextEdit,QFileDialog, QTreeView
     )
-from PyQt5.QtGui import QIcon,QIntValidator
+from PyQt5.QtGui import QIcon,QIntValidator,QPixmap
 from PyQt5.QtCore import pyqtSlot,QAbstractTableModel
 import argparse 
 import json
 from logger import logger
 import requests
+#from PIL import Image
+import numpy as np
+#import paddlehub as hub
+from paddleocr import PaddleOCR
+
+# 加载移动端预训练模型
+# ocr = hub.Module(name="chinese_ocr_db_crnn_mobile")
+# 服务端可以加载大模型，效果更好
+# ocr = hub.Module(name="chinese_ocr_db_crnn_server")
+ocr = PaddleOCR(use_angle_cls=True, lang="ch") 
 
 class DataFrameModel(QAbstractTableModel): 
     DtypeRole = QtCore.Qt.UserRole + 1000
@@ -435,6 +447,100 @@ class RESTWidget(QWidget):
 
 
 
+
+class OCRWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self._start_dt = ValueWrapper(0)
+        self._end_dt =  ValueWrapper(0)
+        self._postdata = ValueWrapper('')
+        self._params = ValueWrapper('')
+
+        self.initUI()
+        
+    def initUI(self):
+        #self.setWindowTitle(self._title)
+        file_lb = QLabel('图片文件:')
+        self.file_le = QLineEdit()
+        #options_le.textChanged.connect(lambda x:self._postdata.set_value(x))
+        self.file_le.setDisabled(True)
+        file_btn = QPushButton('打开')
+        file_btn.clicked.connect(self.on_openimage)
+        hbox5 = QHBoxLayout()
+        hbox5.addWidget(file_lb)
+        hbox5.addWidget(self.file_le)
+        hbox5.addWidget(file_btn)
+
+        self.imagelabel = QLabel()
+        self.orctext = QPlainTextEdit()
+        hbox3 = QHBoxLayout()
+        hbox3.addWidget(self.imagelabel)
+        hbox3.addWidget(self.orctext)
+
+        indis_lb = QLabel('参数')
+        indis_le = QSpinBox()
+        #indis_le.textChanged.connect(lambda x:self._params.set_value(x))
+        self.execBtn = QPushButton('提取')
+        self.execBtn.clicked.connect(self.on_processimage)
+        hbox2 = QHBoxLayout()
+        hbox2.addWidget(indis_lb)
+        hbox2.addWidget(indis_le)
+        hbox2.addWidget(self.execBtn)
+
+        # Add box layout, add table to box layout and add box layout to widget
+        self.layout = QVBoxLayout()
+
+        #self.layout.addLayout(hbox1) 
+        self.layout.addLayout(hbox5) 
+
+        self.layout.addWidget(hbox3) 
+        self.layout.addLayout(hbox2) 
+
+        self.setLayout(self.layout) 
+
+
+
+    @pyqtSlot()
+    def on_openimage(self):
+        try:
+            imgName,imgType= QFileDialog.getOpenFileName(None,
+                                    "打开图片",
+                                    "",
+                                    " *.jpg;;*.png;;*.jpeg;;*.bmp;;All Files (*)")
+            #利用qlabel显示图片
+            self.file_le.setText(imgName)
+            img  = QPixmap(imgName).scaled(self.imagelabel.width(), self.imagelabel.height())
+            self.imagelabel.setPixmap(img)
+        except Exception as e:
+            logger.error(f'call open image exception:', exc_info=True)
+            self.showMsgDialog('调用异常','请求异常: ' + self.file_le.text(), detailed_text=str(e))
+
+    @pyqtSlot()
+    def on_processimage(self):
+        img_path = self.file_le.text()
+        if len(img_path) == 0:
+            self.showMsgDialog('提取失败','文件没有找到: ' + self.file_le.text())
+            return
+
+        text = ''
+        result = ocr.ocr(img_path, cls=True)
+        for line in result:
+            print(line)
+            text = text + line + '\n'
+        self.orctext.setPlainText(text)
+
+
+    def showMsgDialog(self, title:str,text:str,detailed_text=''):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setText(text)
+        msg.setWindowTitle(title)
+        #msg.setDetailedText(detailed_text)
+        msg.setInformativeText(detailed_text)
+        msg.setStandardButtons(QMessageBox.Ok)
+        return msg.exec_()
+
+
 class App(QTabWidget):
     def __init__(self,conf):
         super().__init__()
@@ -444,6 +550,7 @@ class App(QTabWidget):
         self._raftWidget = RESTWidget(conf.get('raft').get('endpoints'),conf.get('raft').get('funcs'))
         self._quotesWidget = RESTWidget(conf.get('quotes').get('endpoints'), conf.get('quotes').get('funcs'))
         self._tradeWidget = RESTWidget(conf.get('trade').get('endpoints'), conf.get('trade').get('funcs'), listkey='data')
+        self._ocrWidget = OCRWidget()
 
         self.initUI()
         
@@ -455,6 +562,7 @@ class App(QTabWidget):
         # add sql subWidget
         self.addTab(self._quotesWidget, '行情查询')
         self.addTab(self._tradeWidget, '交易查询')
+        self.addTab(self._ocrWidget, 'OCR')
 
         self.resize(self._width,self._height)
         # Show widget

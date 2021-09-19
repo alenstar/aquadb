@@ -1,5 +1,7 @@
 #include "filestream.h"
 #include "logdef.h"
+#include <unistd.h>
+#include <sys/types.h>
 #include <memory>
 #include <string>
 

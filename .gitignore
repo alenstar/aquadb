@@ -58,6 +58,9 @@ rules.ninja
 .vscode
 *.pro.user
 data/*.db
+*.csv
+*.feather
+*.parquet
 build
 output
 *.user.*

@@ -165,7 +165,7 @@ static inline mdlink_api::MarketQuotePtr parse_quote(const string& raw_line)
         }
 		int i = 3;
 		quote->last = atof(values[i++].c_str());
-		quote->prev_close = atof(values[i++].c_str());
+		quote->preclose = atof(values[i++].c_str());
 		quote->open = atof(values[i++].c_str());
 		quote->volume = atoll(values[i++].c_str()) * 100;
 		i += 2; // ignore the outer, inner

@@ -203,6 +203,11 @@ enum class STRATEGY_RUN_TYPE { NONE = 0, BACKTEST = 1, SIMULATE = 2, ACTUAL = 3 
 class CerebroOrder
 {
   public:
+    // 订单id
+    long long order_id = 0;
+    // 母单id
+    // long long base_order_id = 0;
+
     // 成交均价
     double filled_price = 0;
 
@@ -216,16 +221,6 @@ class CerebroOrder
     double unfilled_quantity = 0;
     // 冻结价格
     double frozen_price = 0;
-    // 消息 (下单是填充)
-    std::string msg;
-    // 原因 (撮合时，系统填充, 用于描述未成交原因)
-    std::string reason;
-    // 合约
-    Symbol symbol;
-    // 订单id
-    long long order_id = 0;
-    // 母单id
-    // long long base_order_id = 0;
 
     // 订单开平
     // POSITION_EFFECT position_effect;
@@ -252,6 +247,16 @@ class CerebroOrder
     // 费用
     double transaction_cost = 0;
 
+    // 最近持仓均价(此订单成交前的, 仅平仓才有， 可用于计算平仓胜率)
+    double last_position_price = 0;
+
+    // 消息 (下单是填充)
+    std::string msg;
+    // 原因 (撮合时，系统填充, 用于描述未成交原因)
+    std::string reason;
+    // 合约
+    Symbol symbol;
+
     nlohmann::json to_json() const {
       nlohmann::json js;
       js["filled_price"] = filled_price;
@@ -269,6 +274,7 @@ class CerebroOrder
       js["type"] = type;
       js["trading_date"] = trading_date;
       js["transaction_cost"] = transaction_cost;
+      js["last_position_price"] = last_position_price;
       js["reason"] = reason;
       js["msg"] = msg;
       return js;
@@ -323,6 +329,10 @@ class CerebroPosition
     // xxxx 
     double total_commited = 0.0;
 
+    // 开仓日期 
+    int open_dt = 0;
+    // 平仓日期
+    int close_dt = 0;
     // 当前持仓的市值
     inline double market_value() const {
       return avg_price * quantity;
@@ -342,6 +352,8 @@ class CerebroPosition
       js["trading_pnl"] = trading_pnl;
       js["avg_price"] = avg_price;
       js["commissions"] = commissions;
+      js["open_dt"] = open_dt;
+      js["close_dt"] = close_dt;
       return js;
     }
 
@@ -427,12 +439,12 @@ class CerebroTickRecord
     double last = 0;                  // 当前最新价
     double low = 0;                   // 截止到当前的最低价
     double open = 0;                  // 当日开盘价
-    double prev_close = 0;            // 昨日收盘价
+    double preclose = 0;            // 昨日收盘价
     double turnover = 0;        // 截止到当前的成交额
     double volume = 0;                // 截止到当前的成交量
 
     double open_interest = 0;      // 截止到当前的持仓量（期货专用）
-    double prev_open_interest = 0; // 昨日的持仓量（期货专用）
+    double preopen_interest = 0; // 昨日的持仓量（期货专用）
     double settlement = 0;         // 结算价（期货专用）
     double prev_settlement = 0;    // 昨日结算价（期货专用）
 
@@ -450,7 +462,7 @@ class CerebroTickRecord
             //oss << o.close <<",";
             oss << o.last <<",";
           
-            oss << o.prev_close << ",";
+            oss << o.preclose << ",";
             oss << o.volume << ",";
             for(size_t i = 0; i < 5;++i)
             {
@@ -474,7 +486,7 @@ class CerebroTickRecord
       js["low"] = low;
       js["open"] = open;
       //js["close"] = close;
-      js["prev_close"] = prev_close;
+      js["preclose"] = preclose;
       js["turnover"] = turnover;
       js["volume"] = volume;
       js["bids"] = nlohmann::json::array_t();
@@ -528,12 +540,12 @@ class CerebroKlineRecord
     double close = 0;          // 当前最新价
     double low = 0;            // 截止到当前的最低价
     double open = 0;           // 当日开盘价
-    double prev_close = 0;     // 昨日收盘价
+    double preclose = 0;     // 昨日收盘价
     double turnover = 0; // 截止到当前的成交额
     double volume = 0;         // 截止到当前的成交
 
     double open_interest = 0;      // 截止到当前的持仓量（期货专用）
-    double prev_open_interest = 0; // 昨日的持仓量（期货专用）
+    double preopen_interest = 0; // 昨日的持仓量（期货专用）
     double prev_settlement = 0;    // 昨日结算价（期货专用）
     double settlement = 0;         // 结算价（期货专用）
 
@@ -548,11 +560,11 @@ class CerebroKlineRecord
       js["low"] = low;
       js["open"] = open;
       js["close"] = close;
-      js["prev_close"] = prev_close;
+      js["preclose"] = preclose;
       js["turnover"] = turnover;
       js["volume"] = volume;
         js["open_interest"] = open_interest;
-        js["prev_open_interest"] = prev_open_interest;
+        js["preopen_interest"] = preopen_interest;
         js["prev_settlement"] = prev_settlement;
         js["settlement"] = settlement;
 
@@ -591,25 +603,37 @@ class CerebroCalendar
 
 struct CerebroSeriesValue
 {
-    int date; // 交易日，报告期等
-    int pub_date; // 发布日期(仅财务报表存在)
-    double value;
+    int date = 0; // 交易日，报告期等
+    int pub_date = 0; // 发布日期(仅财务报表存在)
+    double value = 0.0;
 };
 struct CerebroSectionValue
 {
     Symbol symbol;
-    double value;
+    double value = 0.0;
 };
 
 // 区间组合， 用于成份股调入调出， ST或者停复牌
 struct CerebroComponent
 {
     // std::vector<std::pair<int,int>> component; // [start_date, end_date] 闭区间组合
-    int in_date;
-    int out_date;
+    int in_date = 0;
+    int out_date = 0;
     bool contain(int date) const; // 日期在组合内
 };
 
+// 股利
+struct CerebroDividend
+{
+  Symbol symbol;
+  int pub_date = 0; // 分红宣布日  
+  int closure_date = 0;// 股权登记日
+  int dividend_date = 0; // 除权除息日
+  int payable_date = 0; // 分红到帐日
+  int round_lot = 0; // 分红最小单位
+  double dividend_cash = 0; // 现金分红
+  double dividend_share = 0; // 股票派送
+};
 
 struct CerebroConfig
 {

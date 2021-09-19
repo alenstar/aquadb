@@ -41,6 +41,10 @@ CerebroPositionTracker::CerebroPositionTracker(const Symbol &symbol, POSITION_DI
 
 void CerebroPositionTracker::buy(double quantity, double price, double commission)
 {
+    if(util::almost_zero(quantity))
+    {
+        return;
+    }
     // TODO
     if (util::almost_eq(_position.quantity, 0.0))
     {
@@ -65,27 +69,55 @@ void CerebroPositionTracker::buy(double quantity, double price, double commissio
 }
 void CerebroPositionTracker::sell(double quantity, double price, double commission)
 {
+    if(util::almost_zero(quantity))
+    {
+        return;
+    }
     // TODO
     if (util::almost_eq(_position.quantity, 0.0))
     {
         // 没有持仓, 反向开空？
         // new position
-        _position.avg_price = price;
-        _position.quantity = quantity * (-1);
-        _position.commissions = commission;
-        if(_tplus == 0){
-            _position.closable += quantity;
-        }
+        //_position.avg_price = price;
+        //_position.quantity = quantity * (-1);
+        //_position.commissions = commission;
+        //if(_tplus == 0){
+        //    _position.closable += quantity;
+        //}
+        //没持仓了
+        throw std::logic_error("There is no position");
+        return;
     }
     else
     {
+        // 交易的持仓市值(持仓均价计算)
+        double mv = _position.avg_price * quantity;
         _position.avg_price =
             (_position.avg_price * _position.quantity - quantity * price) / (_position.quantity - quantity);
         _position.quantity -= quantity;
         _position.commissions += commission;
-        if(_tplus == 0){
-            _position.closable += quantity;
+        //if(_tplus == 0){
+            _position.closable -= quantity;
+        //}
+        
+        // 交易盈亏(卖出的市值-持仓市值-手续费)
+        if(util::almost_zero(mv)){
+            _position.trading_pnl -= commission;
+        } else {
+            _position.trading_pnl += quantity * price - mv - commission;
         }
+        // 持仓盈亏随行情更新，没有持仓时清空
+        if(util::almost_zero(_position.quantity)) {
+            // 没持仓了，持仓盈亏为0
+            _position.position_pnl = 0;
+        }
+        // 更新Pnl
+        // 平均手续费
+        //auto avg_cost = _position.commissions / _position.quantity;
+        // 差价
+        //auto diff_price = record.close - _position.avg_price;
+        //_position.position_pnl = (diff_price - avg_cost) * _position.quantity;
+
     }
 }
 
@@ -142,6 +174,10 @@ void CerebroPositionTracker::sell_short(double quantity, double price, double co
 
 void CerebroPositionTracker::update(const CerebroTickRecord& record)
 {
+    if(util::almost_zero(_position.quantity))
+    {
+        return;
+    }
     // 平均手续费
     auto avg_cost = _position.commissions / _position.quantity;
     // 差价
@@ -151,6 +187,10 @@ void CerebroPositionTracker::update(const CerebroTickRecord& record)
 
 void CerebroPositionTracker::update(const CerebroKlineRecord& record)
 {
+    if(util::almost_zero(_position.quantity))
+    {
+        return;
+    }
     // 平均手续费
     auto avg_cost = _position.commissions / _position.quantity;
     // 差价
@@ -164,6 +204,52 @@ void CerebroPositionTracker::update(const CerebroKlineRecord& record)
 CerebroMatcher::CerebroMatcher(CerebroBroker *broker) : _broker(broker) {}
 CerebroMatcher::~CerebroMatcher() {}
 
+bool CerebroMatcher::is_over_limit_up(CerebroOrder &order, const CerebroTickRecord &tick)
+{
+    // 不设涨停
+    if(util::almost_zero(tick.limit_up) || std::isnan(tick.limit_up))
+    {
+        return false;
+    }
+    // 涨停
+    if(util::almost_ge(tick.last, tick.limit_up, price_unit(tick.symbol))){
+        return true;
+    }
+    if(util::almost_zero(order.price, price_unit(tick.symbol)))
+    {
+        return false;
+    }
+    // 委托价超出涨停价
+    if(util::almost_gt(order.price, tick.limit_up, price_unit(tick.symbol)))
+    {
+        return true;
+    }
+    return false;
+}
+
+bool CerebroMatcher::is_over_limit_down(CerebroOrder &order, const CerebroTickRecord &tick)
+{
+    // 不设跌停
+    if(util::almost_zero(tick.limit_down) || std::isnan(tick.limit_down))
+    {
+        return false;
+    }
+    // 跌停
+    if(util::almost_le(tick.last, tick.limit_down, price_unit(tick.symbol))){
+        return true;
+    }
+    if(util::almost_zero(order.price, price_unit(tick.symbol)))
+    {
+        return false;
+    }
+    // 委托价超出跌停价
+    if(util::almost_lt(order.price, tick.limit_down, price_unit(tick.symbol)))
+    {
+        return true;
+    }
+    return false;
+}
+
 // int CerebroMatcher::do_order_update(const CerebroOrder &order)
 //{
 //    // TODO
@@ -175,7 +261,15 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
 {
     if (order.action == ORDER_ACTION::BUY)
     {
-        // auto tacker = _broker->get_long_tracker(order.symbol);
+        // 涨停不允许买入
+        if(is_over_limit_up(order, tick))
+        {
+            LOGW("over limit up order: %s %d, order_price: %f, last_price: %f", order.symbol.c_str(), tick.dt, order.price, tick.last);
+            order.status = ORDER_STATUS::REJECTED;
+            order.reason = "over limit up";
+            return 0;
+        }
+        // auto tacker = _broker->get_long_tracker(order.symbol,true);
             auto tota_price = (order.price + _broker->get_slippage() * price_unit(order.symbol)) * order.quantity +  _broker->calc_commission(order);
             // TODO
             // 冻结资金，后面使的冻结的资金来操作
@@ -216,7 +310,15 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
     }
     else if (order.action == ORDER_ACTION::SELL)
     {
-        auto tracker = _broker->get_long_tracker(order.symbol);
+        // 跌停不允许卖出
+        if(is_over_limit_down(order, tick))
+        {
+            LOGW("over limit down order: %s %d, order_price: %f, last_price: %f", order.symbol.c_str(),tick.dt, order.price, tick.last);
+            order.status = ORDER_STATUS::REJECTED;
+            order.reason = "over limit down";
+            return 0;
+        }
+        auto tracker = _broker->get_long_tracker(order.symbol,true);
         if(util::almost_gt(order.quantity, tracker->current_closable()))
         {
             LOGW("invlaid order,Can close the position insufficient: %s, closable:%f, order.quantity:%f", order.symbol.c_str(), tracker->current_closable(),order.quantity);
@@ -239,7 +341,7 @@ int CerebroMatcher::process_limit_order(CerebroOrder &order, const CerebroTickRe
             order.transaction_cost = _broker->calc_commission(order);
             }
             order.status = ORDER_STATUS::FILLED;
-
+            order.last_position_price = tracker->current_position().avg_price;
             if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
@@ -265,6 +367,14 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
 {
     if (order.action == ORDER_ACTION::BUY)
     {
+                // 涨停不允许买入
+        if(is_over_limit_up(order, tick))
+        {
+            LOGW("over limit up order: %s %d, order_price: %f, last_price: %f", order.symbol.c_str(), tick.dt, order.price, tick.last);
+            order.status = ORDER_STATUS::REJECTED;
+            order.reason = "over limit up";
+            return 0;
+        }
             auto tota_price = (tick.last + _broker->get_slippage() * price_unit(order.symbol)) * order.quantity +  _broker->calc_commission(order);
             if(util::almost_gt(tota_price, _broker->get_cash()))
             {
@@ -296,7 +406,15 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
     }
     else if (order.action == ORDER_ACTION::SELL)
     {
-        auto tracker = _broker->get_long_tracker(order.symbol);
+                // 跌停不允许卖出
+        if(is_over_limit_down(order, tick))
+        {
+            LOGW("over limit down order: %s %d, order_price: %f, last_price: %f", order.symbol.c_str(), tick.dt, order.price, tick.last);
+            order.status = ORDER_STATUS::REJECTED;
+            order.reason = "over limit down";
+            return 0;
+        }
+        auto tracker = _broker->get_long_tracker(order.symbol,true);
         if(util::almost_gt(order.quantity, tracker->current_closable()))
         {
             LOGW("invlaid order,Can close the position insufficient: %s, closable:%f, order.quantity:%f", order.symbol.c_str(), tracker->current_closable(),order.quantity);
@@ -313,7 +431,7 @@ int CerebroMatcher::process_market_order(CerebroOrder &order, const CerebroTickR
                 order.transaction_cost = _broker->calc_commission(order);
             }
             order.status = ORDER_STATUS::FILLED;
-
+            order.last_position_price = tracker->current_position().avg_price;
             if (util::almost_ne(order.quantity, order.filled_quantity))
             {
                 // 记录未成交量
@@ -443,11 +561,15 @@ int CerebroBroker::process_special_order(const CerebroOrder &order)
     case ORDER_ACTION::DIVIDEND:
     // 分红送股(执行前市不变),增加持仓和现金
     {
-        auto tracker = get_long_tracker(order.symbol);
+        auto tracker = get_long_tracker(order.symbol,true);
         // 增加持仓
+        if(!util::almost_zero(order.quantity)) {
         tracker->buy(order.quantity, 0.0, order.transaction_cost);
+        }
         // 增加现金
+        if(!util::almost_zero(order.quantity)) {
         _account->add_cash(order.price, order.transaction_cost);
+        }
         return 0;
     }
     // TODO
@@ -503,6 +625,7 @@ void CerebroBroker::commit_order(const CerebroOrder &order)
     {
     if(!is_special_order(order))
     {
+        // 非特殊订单进撮合队列
         _unfill_orders[order.symbol].push_back(order); 
     }
     else 
@@ -514,17 +637,20 @@ void CerebroBroker::commit_order(const CerebroOrder &order)
         {
             co.ctime = now_ms();
             co.status = ORDER_STATUS::REJECTED;
+            co.trading_date = now_date();
         }
         else 
         {
             co.ctime = now_ms();
             co.status = ORDER_STATUS::FILLED;
+            co.trading_date = now_date();
         }
         _filled_orders.push_back(co);
     }
     }
     else 
     {
+        // 非新单直接进完成队列
         _filled_orders.push_back(order);
     }
 }
@@ -533,17 +659,17 @@ void CerebroBroker::on_order_update(const CerebroOrder &order)
 {
     if (is_special_order(order))
     {
-        // TODO
+        // 特殊订单直接在提交是处理完，不进入撮合队列
         // 处理特殊订单， 例如： 分红送红股，出入金等
-        int rc = process_special_order(order);
-        if(rc != 0)
-        {
-            // TODO
-        }
-        else 
-        {
-            // TODO
-        }
+        //int rc = process_special_order(order);
+        //if(rc != 0)
+        //{
+        //    // TODO
+        //}
+        //else 
+        //{
+        //    // TODO
+        //}
         return;
     }
 
@@ -557,7 +683,7 @@ void CerebroBroker::on_order_update(const CerebroOrder &order)
     // 更新持仓
     if (order_longshort(order) == POSITION_DIRECTION::LONG)
     {
-        auto tracker = get_long_tracker(order.symbol);
+        auto tracker = get_long_tracker(order.symbol,true);
         // 多仓方向
         if (order.action == ORDER_ACTION::BUY)
         {
@@ -574,7 +700,7 @@ void CerebroBroker::on_order_update(const CerebroOrder &order)
     }
     else if (order_longshort(order) == POSITION_DIRECTION::SHORT)
     {
-        auto tracker = get_long_tracker(order.symbol);
+        auto tracker = get_long_tracker(order.symbol,true);
         // 空仓方向
         if (order.action == ORDER_ACTION::BUY)
         {
@@ -600,6 +726,11 @@ void CerebroBroker::on_order_update(const CerebroOrder &order)
 // 交易接口，必须返回订单号
 int64_t CerebroBroker::buy(const Symbol &symbol, double quantity, double price)
 {
+    if(util::almost_zero(quantity))
+    {
+        // 无效委托 
+        return -1;
+    }
     CerebroOrder order;
     order.order_id = _order_id_gen();
     order.symbol = symbol;
@@ -616,6 +747,11 @@ int64_t CerebroBroker::buy(const Symbol &symbol, double quantity, double price)
 }
 int64_t CerebroBroker::sell(const Symbol &symbol, double quantity, double price)
 {
+    if(util::almost_zero(quantity))
+    {
+        // 无效委托 
+        return -1;
+    }
     CerebroOrder order;
     order.order_id = _order_id_gen();
     order.symbol = symbol;
@@ -641,6 +777,24 @@ int64_t CerebroBroker::sell_short(const Symbol &symbol, double quantity, double 
     // TODO
     return 0;
 }
+
+ int64_t CerebroBroker::dividend_order(const Symbol &symbol, double quantity, double price)
+ {
+    CerebroOrder order;
+    order.order_id = _order_id_gen();
+    order.symbol = symbol;
+    order.ctime = now_ms();
+    order.mtime = now_ms();
+    order.price = price;
+    order.quantity = quantity;
+    order.status = ORDER_STATUS::PENDING_NEW;
+    order.type = price == 0.0 ? ORDER_TYPE::MARKET : ORDER_TYPE::LIMIT;
+    order.action = ORDER_ACTION::DIVIDEND;
+    // TODO
+    commit_order(order);
+    return order.order_id;
+ }
+
 
 // 撤单视作特殊的订单, 待撤订单id填写在扩展字段中
 int64_t CerebroBroker::cancel_order(int64_t order_id)
@@ -723,6 +877,7 @@ void CerebroBroker::process_normal_order(const CerebroTickRecord &record)
             suborder.price = o.price;
             suborder.quantity = o.unfilled_quantity;
             suborder.unfilled_quantity = 0.0;
+            suborder.last_position_price = 0.0;
             // 分摊手续费
             suborder.transaction_cost = (o.transaction_cost/(o.filled_quantity/o.quantity)) * (1 - o.filled_quantity/o.quantity);
             suborder.trading_date = 0;
@@ -753,10 +908,18 @@ double CerebroBroker::positions_market_value()
     double value = 0.0;
     for(auto const& p: _lpositions)
     {
+        if(p.second->empty())
+        {
+            continue;
+        }
         value += p.second->market_value();
     }
     for(auto const& p: _spositions)
     {
+        if(p.second->empty())
+        {
+            continue;
+        }
         value += p.second->market_value();
     }
     return value;
@@ -794,13 +957,16 @@ void CerebroBroker::do_position_update(const CerebroTickRecord &record)
 
 void CerebroBroker::on_tick(const CerebroTickRecord &record) // 接收tick数据，触发订单撮合
 {
+    // 更新持仓盈亏等
+    if(has_position(record.symbol)) do_position_update(record);
     // 处理订单
     process_normal_order(record);
-    // 更新持仓盈亏等
+    // 撮合后再次 更新持仓盈亏等
     do_position_update(record);
     // 更新账户盈亏市值等
-    if(has_position(record.symbol))
+    // 平仓后没有持仓应该清除对应市值，有持仓的更新市值和盈亏
     {
+        LOGD("symbol:%s pnl:%f, market_value:%f", record.symbol.c_str(), current_positions_pnl(),positions_market_value());
         _account->update_daily_pnl(current_positions_pnl());
         _account->update_market_value(positions_market_value());
     }
@@ -837,14 +1003,16 @@ int CerebroBroker::settle(const std::vector<CerebroKlineRecord>& records)
     for(auto const& record: records)
     {
         // 获取收盘行情来结算
-        auto l = get_long_tracker(record.symbol);
+        auto l = get_long_tracker(record.symbol,false);
         if(l)
         {
             l->settle(record);
+            LOGD("long symbol:%s, closable:%f,quantity:%f", record.symbol.c_str(), l->current_position().closable, l->current_position().quantity);
         }
-        auto s = get_short_tracker(record.symbol);
+        auto s = get_short_tracker(record.symbol,false);
         if(s)
         {
+            LOGD("short symbol:%s, closable:%f,quantity:%f", record.symbol.c_str(), l->current_position().closable, l->current_position().quantity);
             s->settle(record);
         }
     }
@@ -852,15 +1020,27 @@ int CerebroBroker::settle(const std::vector<CerebroKlineRecord>& records)
     // 更新账户收益
     {
         _account->update_daily_pnl(current_positions_pnl());
+        //LOGD("symbol:%s pnl:%f, market_value:%f", record.symbol.c_str(), current_positions_pnl(),positions_market_value());
         _account->update_market_value(positions_market_value());
     }
 
     // 处理除权除息
     // TODO
     
-    // 结算数据入库
-    // 当日订单
-    // 当日持仓
-    // 当日账户
+    // 结算数据持久化
+    // TODO
+    // 每天持仓数据持久化
+    // TODO
+
+    // 清理空仓的tracker
+    auto trackers = get_all_tracker();
+    for(auto const& t: trackers)
+    {
+        remove_tracker(t->symbol(), t->direction());
+    }
+
+    // 当日订单持久化
+    // 当日持仓持久化
+    // 当日账户持久化
     return 0;
 }

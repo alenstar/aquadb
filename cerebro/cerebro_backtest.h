@@ -28,6 +28,7 @@ class CerebroBacktest
     }
 
   protected:
+  void process_dividend(CerebroQuoteProvider* provider, const Symbol& symbol, int dt);
   private:
     CerebroConfig conf_;
     std::map<std::string, CerebroStrategy*> strategys_;
